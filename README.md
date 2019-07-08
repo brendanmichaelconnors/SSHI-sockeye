@@ -1,2 +1,2 @@
 # SSHI sockeye
-Analyses to test for relationships between sockeye survivla indices and infectious agents
+Analyses to test for relationships between sockeye survival indices and infectious agents
