@@ -1,2 +1,2 @@
-# SSHI-sockeye
-Analyses of relationship between sockeye survival and infectious agents
+# sasap-climate-competition
+SASAP Climate Competition working group
