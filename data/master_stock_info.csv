@@ -1,0 +1,20 @@
+Stock.ID,Stock,Region,Ocean.Region,Sub.Region,lat,lon,ocean_label
+1,Early Stuart,Fraser River,WC,Fraser Early Stuart,49.12,-123.06,West Coast
+4,Bowron,Fraser River,WC,Fraser Early Summer,49.12,-123.06,West Coast
+14,Fennell,Fraser River,WC,Fraser Early Summer,49.12,-123.06,West Coast
+16,Gates,Fraser River,WC,Fraser Early Summer,49.12,-123.06,West Coast
+17,Nadina,Fraser River,WC,Fraser Early Summer,49.12,-123.06,West Coast
+18,Pitt,Fraser River,WC,Fraser Early Summer,49.12,-123.06,West Coast
+5,Raft,Fraser River,WC,Fraser Early Summer,49.12,-123.06,West Coast
+15,Scotch,Fraser River,WC,Fraser Early Summer,49.12,-123.06,West Coast
+8,Seymour,Fraser River,WC,Fraser Early Summer,49.12,-123.06,West Coast
+7,Chilko,Fraser River,WC,Fraser Summer,49.12,-123.06,West Coast
+2,Late Stuart,Fraser River,WC,Fraser Summer,49.12,-123.06,West Coast
+6,Quesnel,Fraser River,WC,Fraser Summer,49.12,-123.06,West Coast
+3,Stellako,Fraser River,WC,Fraser Summer,49.12,-123.06,West Coast
+10,Birkenhead,Fraser River,WC,Fraser Late,49.12,-123.06,West Coast
+11,Cultus,Fraser River,WC,Fraser Late,49.12,-123.06,West Coast
+19,Harrison,Fraser River,WC,Fraser Late,49.12,-123.06,West Coast
+9,Late Shuswap,Fraser River,WC,Fraser Late,49.12,-123.06,West Coast
+12,Portage,Fraser River,WC,Fraser Late,49.12,-123.06,West Coast
+13,Weaver,Fraser River,WC,Fraser Late,49.12,-123.06,West Coast
