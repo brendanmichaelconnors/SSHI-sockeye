@@ -6,7 +6,7 @@ output:
   pdf_document: default
 ---
 
-##SSHI sockeye exploratory analyses (stage 1)
+## SSHI sockeye exploratory analyses (stage 1)
 `r Sys.Date()`
 
 This document summarizes some quick exploratory analyses to derive Fraser sockeye survival indices. All code and associated data can be found on Github [here](https://github.com/brendanmichaelconnors/SSHI-sockeye). 
