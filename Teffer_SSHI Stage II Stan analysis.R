@@ -1,9 +1,7 @@
 #SSHI ANALYSIS SOCKEYE STAGE II
 #Teffer
 #### Load packages
-setwd("~/Documents.nosync/DFO PDF/Data/R")
-source('biostats.R')
-library(rmarkdown)
+setwd("~/Documents.nosync/DFO PDF/Data/SSHI-sockeye")
 library(lme4)
 library(rstanarm) # https://mc-stan.org/users/documentation/case-studies/tutorial_rstanarm.html
 library(ggplot2)
