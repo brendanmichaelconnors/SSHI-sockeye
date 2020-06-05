@@ -586,12 +586,12 @@ ggplot(stk.spec.ic_mul) +
 stk.spec.te_mar <-stspslp[stspslp$agent=="te_mar",]
 ggplot(stk.spec.te_mar) +
   geom_hline(yintercept = 0, linetype = "dashed") +
-  geom_linerange(aes(x = reorder(stock, -X50), ymax = X75, ymin = X25), size=1.5, col="gray") +
-  geom_linerange(aes(x = stock, ymax = X97.5, ymin = X2.5), col="gray") +
-  geom_linerange(data=stk.spec.te_mar[stk.spec.te_mar$stock=="Total",], aes(x = stock, ymax = X75, ymin = X25), size=2, col="black") +
-  geom_linerange(data=stk.spec.te_mar[stk.spec.te_mar$stock=="Total",], aes(x = stock, ymax = X2.5, ymin = X97.5), col="black") +
-  geom_point(aes(x = stock, y = X50), size = 2) +
-  geom_point(data=stk.spec.te_mar[stk.spec.te_mar$stock=="Total",], aes(x = stock, y = X50), size = 3) +
+  geom_linerange(aes(x = reorder(X, -X50), ymax = X75, ymin = X25), size=1.5, col="gray") +
+  geom_linerange(aes(x = X, ymax = X97.5, ymin = X2.5), col="gray") +
+  geom_linerange(data=stk.spec.te_mar[stk.spec.te_mar$X=="Total",], aes(x = X, ymax = X75, ymin = X25), size=2, col="black") +
+  geom_linerange(data=stk.spec.te_mar[stk.spec.te_mar$X=="Total",], aes(x = X, ymax = X2.5, ymin = X97.5), col="black") +
+  geom_point(aes(x = X, y = X50), size = 2) +
+  geom_point(data=stk.spec.te_mar[stk.spec.te_mar$X=="Total",], aes(x = X, y = X50), size = 3) +
   labs(x="Stocks", y="Effect size") +
   coord_flip()
 
@@ -599,12 +599,12 @@ ggplot(stk.spec.te_mar) +
 stk.spec.pa_ther <-stspslp[stspslp$agent=="pa_ther",]
 ggplot(stk.spec.pa_ther) +
   geom_hline(yintercept = 0, linetype = "dashed") +
-  geom_linerange(aes(x = reorder(stock, -X50), ymax = X75, ymin = X25), size=1.5, col="gray") +
-  geom_linerange(aes(x = stock, ymax = X97.5, ymin = X2.5), col="gray") +
-  geom_linerange(data=stk.spec.pa_ther[stk.spec.pa_ther$stock=="Total",], aes(x = stock, ymax = X75, ymin = X25), size=2, col="black") +
-  geom_linerange(data=stk.spec.pa_ther[stk.spec.pa_ther$stock=="Total",], aes(x = stock, ymax = X2.5, ymin = X97.5), col="black") +
-  geom_point(aes(x = stock, y = X50), size = 2) +
-  geom_point(data=stk.spec.pa_ther[stk.spec.pa_ther$stock=="Total",], aes(x = stock, y = X50), size = 3) +
+  geom_linerange(aes(x = reorder(X, -X50), ymax = X75, ymin = X25), size=1.5, col="gray") +
+  geom_linerange(aes(x = X, ymax = X97.5, ymin = X2.5), col="gray") +
+  geom_linerange(data=stk.spec.pa_ther[stk.spec.pa_ther$X=="Total",], aes(x = X, ymax = X75, ymin = X25), size=2, col="black") +
+  geom_linerange(data=stk.spec.pa_ther[stk.spec.pa_ther$X=="Total",], aes(x = X, ymax = X2.5, ymin = X97.5), col="black") +
+  geom_point(aes(x = X, y = X50), size = 2) +
+  geom_point(data=stk.spec.pa_ther[stk.spec.pa_ther$X=="Total",], aes(x = X, y = X50), size = 3) +
   labs(x="Stocks", y="Effect size") +
   coord_flip()
 
@@ -612,11 +612,11 @@ ggplot(stk.spec.pa_ther) +
 #################################################################################
 #################################################################################
 # LOAD - INDEPENDENT MODELS by AGENT
+###STILL WORKING ON LOAD CODE###
 
 ## Global metric - Independent models
 
 ### Loop for STAN independent models
-agents <- unique(inf_agt_resid_data_gl$agent)
 for(i in agents){
   data <- subset(inf_agt_resid_data_gl, agent==i)
   nam <- paste("mod.load", i, sep = ".")
@@ -627,7 +627,7 @@ for(i in agents){
 }
 
 ## Loop to derive coefficient estimates
-coefs_stan <- matrix(NA,
+coefs_stan_l <- matrix(NA,
                      nrow = length(agents),
                      ncol = 5,
                      dimnames = list(agents,c("lower","25","mid","75","upper")))
@@ -637,17 +637,16 @@ for(i in agents){
                       pars = c("load_std"),
                       probs = c(0.025,0.25,0.5,0.75, 0.975),
                       digits = 2)
-  coefs_stan[i,] <- ind_coef[1,c(4:8)]
+  coefs_stan_l[i,] <- ind_coef[1,c(4:8)]
 }
-write.csv(coefs_stan, file="load_coefs_stan_global_indep mod.csv")
+write.csv(coefs_stan_l, file="data/load_coefs_stan_global_indep mod.csv")
 
-#load estimates from file
-agents <- unique(inf_agt_resid_data_gl$agent)
-coefs_stan <- read.csv("load_coefs_stan_global_indep mod.csv")
+# Load estimates from file and add rownames
+coefs_stan <- read.csv("data/load_coefs_stan_global_indep mod.csv")
 rownames(coefs_stan) <- coefs_stan[,1]
-coefs_stan <- coefs_stan[,-1] # drop first column with agent names
+coefs_stan <- coefs_stan[,-1] 
 
-#Plot effect size of agents
+# Plot effect size of agents
 coefs_order <- coefs_stan[order(coefs_stan[,3]),]
 par(mfrow=c(1,1), mar=c(3,1,1,1),oma=c(0.5,0.5,0.5,0.5))
 
@@ -688,12 +687,11 @@ text(rep(-1.75,length(agents)),
 axis(1, at = c(-1, -0.5, 0, 0.5, 1))
 abline(v = 0, lty = 2)
 box(col="grey")	
-mtext("effect size",1,line=2.2, cex=1.1)
+mtext("Effect size",1,line=2.2, cex=1.1)
 mtext("Intensity",3,line=0.25)
 
 
 ## Loop to derive posteriors by stock
-stocks<-unique(inf_agt_resid_data_gl$Stock)
 ### Intercepts
 coefs_stan_stk_int_load <- matrix(NA,
                                   nrow = length(stocks),
