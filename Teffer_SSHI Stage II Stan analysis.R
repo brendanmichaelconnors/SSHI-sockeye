@@ -17,28 +17,33 @@ library(shinystan)
 library(data.table)
 library(base)
 
-#### Read in data and clean
-
-# SW metric averaged across all stocks each year per agent  
-inf_agt_resid_data_gl <- read.csv("~data/global_ONNE_productivity_infection_analysis.csv")
+#### Read in data, clean, standardize - SW metric averaged across all stocks each year per agent  
+inf_agt_resid_data_gl <- read.csv("data/global_ONNE_productivity_infection_analysis.csv")
 head(inf_agt_resid_data_gl)
 
+# Data cleaning
 inf_agt_resid_data_gl$mean_load_all <- inf_agt_resid_data_gl$mean_load #add col for mean_load_all
 inf_agt_resid_data_gl$mean_load_all[is.na(inf_agt_resid_data_gl$mean_load_all)] <- 0 #replace NA with 0
 
+# Standardize and incorporate into df
 inf_std <- plyr::ddply(inf_agt_resid_data_gl, c("agent"),function(x) {
   scaled_prev <- scale(x$prev)
   scaled_load <- scale(x$mean_load_all)
   xx <- data.frame(scaled_prev, scaled_load)
 })
-
 inf_agt_resid_data_gl$prev_std <- inf_std[,2]
 inf_agt_resid_data_gl$load_std <- inf_std[,3]
-agents <- unique(inf_agt_resid_data_gl$agent)
+
+# Add Stock column to update later
 inf_agt_resid_data_gl$Stock <- inf_agt_resid_data_gl$Stock_Analysis
 head(inf_agt_resid_data_gl)
 
-#Plot total detections of each agent by year
+# Create objects for analysis
+agents <- unique(inf_agt_resid_data_gl$agent)
+stocks <- unique(inf_agt_resid_data_gl$Stock)
+years <- unique(inf_agt_resid_data_gl$Year)
+
+# Plot total detections of each agent by year - note variable prevalence across agents and years
 samplesperagent.sw<-inf_agt_resid_data_gl %>% 
   group_by(agent, Year) %>%
   summarise(N. = sum(N.))
@@ -48,7 +53,9 @@ ggplot(data=samplesperagent.sw, aes(x=reorder(agent, N.), y=N., fill=factor(Year
   xlab("Stock")+
   ylab("sample totals")
 
-#plot raw data - Prevalence
+# Plot raw data by: 
+## Prevalence
+
 ggplot(inf_agt_resid_data_gl,aes(prev, resid_value, color=Stock, shape=factor(Year)))+
   geom_smooth(aes(prev, resid_value, group=Stock), method = "lm", se=F, size=.2)+
   geom_point()+
@@ -58,7 +65,7 @@ ggplot(inf_agt_resid_data_gl,aes(prev, resid_value, color=Stock, shape=factor(Ye
   ylab("residual")+
   theme_bw()
 
-#plot raw data - Load
+## Load
 ggplot(inf_agt_resid_data_gl,aes(log10(mean_load), resid_value, color=Stock, shape=factor(Year)))+
   geom_smooth(aes(log10(mean_load), resid_value, group=Stock), method = "lm", se=F, size=.2)+
   geom_point()+
@@ -68,48 +75,12 @@ ggplot(inf_agt_resid_data_gl,aes(log10(mean_load), resid_value, color=Stock, sha
   ylab("residual")+
   theme_bw()
 
-## Plot raw agent data by latitude
-### In spsu, calculate count/sampled per year
-ic_mul.spsu<-spsu[spsu]
-spsu.year <-spsu %>% group_by(Year) #create object to be summarized by year
-
-##ic_mul
-all.ic_mul.sw =
-  data.frame(
-    spsu.year %>% 
-      summarise(
-        mean(Latitude[Latitude!=0], na.rm=TRUE),
-        min(Latitude[Latitude!=0], na.rm=TRUE),
-        max(Latitude[Latitude!=0], na.rm=TRUE),
-        length(which(ic_mul!="NA")), #samples
-        length(which(ic_mul>0)), #positive detections
-        length(which(ic_mul>0))/length(which(!is.na(ic_mul))),  #calculates prevalence
-        mean(ic_mul[ic_mul!=0], na.rm=TRUE),
-        (length(which(ic_mul>0)) / length(which(!is.na(ic_mul)))) * mean(ic_mul[ic_mul!=0], na.rm=TRUE)
-      )
-  )
-names(all.ic_mul.sw) <- c("Year", "Latitude", "minLat", "maxLat", "N", "N+", "prev", "mean_load", "prevload") #rename columns
-all.ic_mul.sw$brood_year<-all.ic_mul.sw$Year-2
-
-ggplot(all.ic_mul.sw,aes(prev, Latitude, color=factor(brood_year))) +
-  geom_point() +
-  geom_linerange(aes(ymin = minLat, ymax = maxLat)) +
-  coord_flip()
-ggplot(all.ic_mul.sw,aes(Latitude, brood_year)) +
-  geom_point()
-
-ggplot(spsu,aes(Latitude, log10(ic_mul), shape=Zone, color=factor(Year))) +
-  geom_point() +
-  geom_smooth(aes(Latitude, log10(ic_mul)), method = "lm", se=F, size=.2) 
-
-
-
 
 # STAN Approach for Multi-level Modeling
 
 # PREVALENCE - INDEPENDENT MODELS by AGENT
 
-## Global metric - Independent models
+## SW metric averaged across all stocks per year - Independent models
 
 ### Create files for each agent
 for(i in unique(inf_agt_resid_data_gl$agent)) {
@@ -117,9 +88,7 @@ for(i in unique(inf_agt_resid_data_gl$agent)) {
   assign(nam, inf_agt_resid_data_gl[inf_agt_resid_data_gl$agent==i,])
 }
 
-
 ### Loop for STAN independent models
-agents <- unique(inf_agt_resid_data_gl$agent)
 for(i in agents){
   data <- subset(inf_agt_resid_data_gl, agent==i)
   nam <- paste("mod", i, sep = ".")
@@ -128,10 +97,11 @@ for(i in agents){
                         adapt_delta=0.95,
                         REML = F))
 }
+
+# uninformed priors - for example:
 prior_summary(mod.arena2)
 
-
-## Loop to derive coefficient estimates
+## Derive coefficient estimates and save in .csv file
 coefs_stan <- matrix(NA,
                      nrow = length(agents),
                      ncol = 5,
@@ -144,15 +114,14 @@ for(i in agents){
                       digits = 2)
   coefs_stan[i,] <- ind_coef[1,c(4:8)]
 }
-write.csv(coefs_stan, file="prev_coefs_stan_global_indep mod.csv")
+write.csv(coefs_stan, file="data/prev_coefs_stan_global_indep mod.csv")
 
-#load estimates from file
-agents <- unique(inf_agt_resid_data_gl$agent)
-coefs_stan <- read.csv("prev_coefs_stan_global_indep mod.csv")
+# Load estimates from file (if not running full model) and assign rownames
+coefs_stan <- read.csv("data/prev_coefs_stan_global_indep mod.csv")
 rownames(coefs_stan) <- coefs_stan[,1]
-coefs_stan <- coefs_stan[,-1] # drop first column with agent names
+coefs_stan <- coefs_stan[,-1]  
 
-#Plot effect size of agents
+# Plot effect size per agent
 coefs_order <- coefs_stan[order(coefs_stan[,3]),]
 par(mfrow=c(1,1), mar=c(3,1,1,1),oma=c(0.5,0.5,0.5,0.5))
 
@@ -193,12 +162,12 @@ text(rep(-1.75,length(agents)),
 axis(1, at = c(-1, -0.5, 0, 0.5, 1))
 abline(v = 0, lty = 2)
 box(col="grey")	
-mtext("effect size",1,line=2.2, cex=1.1)
+mtext("Effect size",1,line=2.2, cex=1.1)
 mtext("Prevalence",3,line=0.25)
 
 
-## Loop to derive posteriors by stock
-stocks<-unique(inf_agt_resid_data_gl$Stock)
+## Derive posterior estimates by stock
+
 ### Intercepts
 coefs_stan_stk_int <- matrix(NA,
                              nrow = length(stocks),
@@ -230,7 +199,6 @@ for(i in agents){
 }
 
 ### Year intercepts
-years<-unique(inf_agt_resid_data_gl$Year)
 coefs_stan_stk_year <- matrix(NA,
                               nrow = length(years),
                               ncol = 6,
@@ -261,12 +229,12 @@ for(i in agents){
 }
 
 ### Rhat and Neff
-#extract parameter names
-sims<-as.matrix(mod.arena2) #use any model to get parameter names, they should be the same
+sims <-as.matrix(mod.arena2) #extract parameter names from any agent model 
 dim(sims)
 para_name <- c(colnames(sims), "mean_PPD", "log-posterior")
 para_name
 
+#### Rhat
 coefs_stan_stk_rhat <- matrix(NA,
                               nrow = length(para_name),
                               ncol = 2,
@@ -279,6 +247,7 @@ for(i in agents){
   as.matrix(assign(nam, coefs_stan_stk_rhat[i] <- cbind(ind_coef[c(1:52),1], paste(i), paste("Rhat"))))
 }
 
+#### Neff
 coefs_stan_stk_neff <- matrix(NA,
                               nrow = length(para_name),
                               ncol = 2,
@@ -290,7 +259,7 @@ for(i in agents){
   as.matrix(assign(nam, coefs_stan_stk_neff[i] <- cbind(ind_coef[c(1:52),1], paste(i), paste("Neff"))))
 }
 
-#### Rbind all posteriors and write as csv
+#### Rbind all posteriors and save as .csv file
 post_int_slpintsig <- rbind(coefs_stan_stk_int.arena2,
                             coefs_stan_stk_int.c_b_cys,
                             coefs_stan_stk_int.ce_sha,
@@ -388,9 +357,9 @@ post_int_slpintsig <- rbind(coefs_stan_stk_int.arena2,
                             coefs_stan_stk_year.te_mar,
                             coefs_stan_stk_year.ven)
 
-write.csv(post_int_slpintsig, file="Posterior distributions_Int Slp Sig_global_indep mod_prev.csv")
+write.csv(post_int_slpintsig, file="data/Posterior distributions_Int Slp Sig_global_indep mod_prev.csv")
 
-#### Rbind all convergence parameters and write as csv
+#### Rbind all convergence parameters and save as .csv file
 post_rhatneff_prev <- rbind(coefs_stan_stk_rhat.arena2,
                             coefs_stan_stk_rhat.c_b_cys,
                             coefs_stan_stk_rhat.ce_sha,
@@ -440,39 +409,23 @@ post_rhatneff_prev <- rbind(coefs_stan_stk_rhat.arena2,
                             coefs_stan_stk_neff.te_mar,
                             coefs_stan_stk_neff.ven)
 
-write.csv(post_rhatneff_prev, file="Posterior distributions_Rhat and Neff_global_indep mod_prev.csv")
+write.csv(post_rhatneff_prev, file="data/Posterior distributions_Rhat and Neff_global_indep mod_prev.csv")
 
-#Plot posteriors
-posterior <- as.matrix(mod.ic_mul)
-plot_title <- ggtitle("Posterior distributions",
-                      "with medians and 80% intervals")
-mcmc_intervals(posterior,
-               prob = 0.8) + plot_title
-mcmc_areas(posterior,
-           regex_pars = c("b\\[\\(\\Intercept) Year"),
-           prob = 0.8) + plot_title
-mcmc_intervals(posterior,
-               regex_pars = c("b\\[\\prev_std Stock\\:"),
-               prob = 0.5) + plot_title  
-
-
-
-
-## Plot from file
-post_all <- read.csv("Posterior distributions_Int Slp Sig_global_indep mod_prev.csv")
-post_all <- droplevels(post_all[!post_all$X.1 == "smallUK",])
-post_agents <- read.csv("prev_coefs_stan_global_indep mod.csv")
+### Plot posteriors per agent model from files
+post_all <- read.csv("data/Posterior distributions_Int Slp Sig_global_indep mod_prev.csv")
+post_all <- droplevels(post_all[!post_all$X.1 == "smallUK",]) #remove smallUK from analysis
+post_agents <- read.csv("data/prev_coefs_stan_global_indep mod.csv")
 post_agents <- droplevels(post_agents[!post_agents$X == "smallUK",])
 
-## Plot Posterior for all agents
-tiff('Fig_SSHI ONNE Pathogen Productivity_Agent slopes_Prevalence.tiff', 
-     units="in", width=5, height=6, res=300)
+## Plot Posteriors for all agents
+#tiff('Fig_SSHI ONNE Pathogen Productivity_Agent slopes_Prevalence.tiff', 
+#     units="in", width=5, height=6, res=300)
 ggplot(post_agents) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   geom_linerange(aes(x = reorder(X, -mid), ymax = X75, ymin = X25), size=1.5, col="darkblue") +
   geom_linerange(aes(x = X, ymax = upper, ymin = lower), col="darkblue") +
   geom_point(aes(x = X, y = mid), size = 3, col="darkblue")+
-  labs(x ="Infectious agents", y = "Global effect size", title="Prevalence")+
+  labs(x ="Infectious agents", y = "Effect size", title="Prevalence")+
   scale_x_discrete(labels=c("ic_mul" = "I. multifiliis", 
                             "te_mar" = "T. maritinum",
                             "pa_ther" = "P. theridion",
@@ -498,15 +451,18 @@ ggplot(post_agents) +
                             "de_sal" = "D. salmonis"))+
   theme(axis.text.y = element_text(face = "italic"), plot.title = element_text(hjust = 0.5))+
   coord_flip()
-dev.off()
+#dev.off()
 
-
-# Plots for ic_mul
+## Plots per agent
+#### Extract output from agent model
 post_ic_mul <- post_all[post_all$X.1=="ic_mul",]
-## Plot Posterior slopes for Stocks
+
+## Extract Posterior slopes by Stock
 post_ic_mul_stockslp <- post_ic_mul[grep("prev_std Stock", post_ic_mul$X) ,]
-tiff('Fig_SSHI ONNE Pathogen Productivity_ic_mul prev by stock.tiff', 
-     units="in", width=5, height=6, res=300)
+
+#### Plot
+#tiff('Fig_SSHI ONNE Pathogen Productivity_ic_mul prev by stock.tiff', 
+#     units="in", width=5, height=6, res=300)
 ggplot(post_ic_mul_stockslp) +
   geom_hline(yintercept = 0, linetype = "dashed", col="blue")+
   geom_linerange(aes(x = reorder(X, -X50.), ymax = X75., ymin = X25.), size=1.5, col="black") +
@@ -514,10 +470,11 @@ ggplot(post_ic_mul_stockslp) +
   geom_point(aes(x = X, y = X50.), size = 3) +
   ylim(-0.8,0.8)+
   coord_flip()
-dev.off()
+#dev.off()
 
-## Plot Posterior intercepts for Stocks
+## Extract Posterior intercepts for Stocks - ic_mul example
 post_ic_mul_stockint <- post_ic_mul[c(1:18) ,]
+## Plot
 ggplot(post_ic_mul_stockint) +
   geom_hline(yintercept = 0, linetype = "dashed")+
   geom_linerange(aes(x = reorder(X, -X50.), ymax = X75., ymin = X25.), size=1.5, col="gray") +
@@ -525,16 +482,19 @@ ggplot(post_ic_mul_stockint) +
   geom_point(aes(x = X, y = X50.), size = 2) +
   coord_flip()
 
-## Plot sigma values
+## Extract sigma values
 post_ic_mul_stocksig <- post_ic_mul[grep("igma", post_ic_mul$X) ,]
+## Plot
 ggplot(post_ic_mul_stocksig) +
   geom_hline(yintercept = 0, linetype = "dashed")+
   geom_linerange(aes(x = X, ymax = X75., ymin = X25.), size=1.5, col="gray") +
   geom_linerange(aes(x = X, ymax = X97.5., ymin = X2.5.), col="gray") +
   geom_point(aes(x = X, y = X50.), size = 2) +
   coord_flip()
-## Plot Posterior intercepts for year
+
+## Extract Posterior intercepts for years
 post_ic_mul_year <- post_ic_mul[grep("b\\[\\(\\Intercept) Year", post_ic_mul$X) ,]
+## Plot
 ggplot(post_ic_mul_year) +
   geom_hline(yintercept = 0, linetype = "dashed")+
   geom_linerange(aes(x = reorder(X, -X50.), ymax = X75., ymin = X25.), size=1.5, col="gray") +
@@ -542,58 +502,115 @@ ggplot(post_ic_mul_year) +
   geom_point(aes(x = X, y = X50.), size = 2) +
   coord_flip()
 
-# Plots for te_mar
-post_te_mar <- post_all[post_all$X.1=="te_mar",]
-## Plot Posterior slopes for Stocks
-post_te_mar_stockslp <- post_te_mar[grep("prev_std Stock", post_te_mar$X) ,]
-tiff('Fig_SSHI ONNE Pathogen Productivity_te_mar prev by stock.tiff', 
-     units="in", width=5, height=6, res=300)
-ggplot(post_te_mar_stockslp) +
-  geom_hline(yintercept = 0, linetype = "dashed", col="blue")+
-  geom_linerange(aes(x = reorder(X, -X50.), ymax = X75., ymin = X25.), size=1.5, col="black") +
-  geom_linerange(aes(x = X, ymax = X97.5., ymin = X2.5.), col="black") +
-  geom_point(aes(x = X, y = X50.), size = 3) +
-  ylim(-0.8,0.8)+
+
+## Calculate stock-specific Posterior estimates by adding 
+## stock-specific draws to "global" (averaged across stocks) and then averaging
+param <- colnames(data.frame(mod.arena2)) #create object of parameters using any model
+temp2 <- data.frame(mod.arena2)
+temp3 <- temp2[,grepl("prev",names(temp2))] #include only columns with "prev" in name (posterior slopes/intercepts)
+temp4 <- temp3[,-grep("igma",colnames(temp3))] #remove sigma-related columns 
+temp <- temp4[2001:4000,] #remove warm up iterations
+temp.add <- data.frame(temp[,1] + temp[,2:19]) #add the stock-specific draws to global column
+df <- cbind(temp4[,1], temp.add) #bind with global column
+para_name2 <- colnames(temp4) #create an object with column names
+colnames(df) <- colnames(temp4) #assign names to columns
+
+## Create a matrix and loop
+stk.spec.slope <- matrix(NA,
+                         nrow = 19,
+                         ncol = 6,
+                         dimnames = list(para_name2,c("2.5","25","50","75","97.5","agent")))
+
+for(i in agents){
+  model<-get(paste("mod",i, sep="."))
+  temp2 <- data.frame(model)
+  temp3 <- temp2[,grepl("prev",names(temp2))] #include only columns with "prev" in name
+  temp4 <- temp3[,-grep("igma",colnames(temp3))] #remove columns with "igma" in name
+  temp5 <- temp4[2001:4000,] #remove warm up iterations
+  temp6 <- data.frame(temp5[,1] + temp5[,2:19]) #add the stock-specific draws to global column
+  temp7 <- cbind(temp5[,1],temp6) #bind with global column
+  para_name2 <- colnames(temp5) #create an object with column names
+  colnames(temp7) <- colnames(temp5) #assign names to columns
+  nam <- paste("stk.spec.slope", i, sep = ".")
+  temp8 <- as.matrix(apply(temp7, 2, quantile, probs = c(0.025,0.25,0.50,0.75,0.975)))
+  temp9 <- t(temp8)
+  temp10<- as.matrix(cbind(temp9, paste(i)))
+  colnames(temp10) <- c("2.5","25","50","75","97.5","agent") #assign names to columns
+  as.matrix(assign(nam, stk.spec.slope[i] <- temp10))
+}
+
+#### Rbind all posteriors and save as .csv file
+stk.spec.slope.all <- rbind(stk.spec.slope.arena2,
+                            stk.spec.slope.c_b_cys,
+                            stk.spec.slope.ce_sha,
+                            stk.spec.slope.de_sal,
+                            stk.spec.slope.fa_mar,
+                            stk.spec.slope.fl_psy,
+                            stk.spec.slope.ic_hof,
+                            stk.spec.slope.ic_mul,
+                            stk.spec.slope.ku_thy,
+                            stk.spec.slope.lo_sal,
+                            stk.spec.slope.my_arc,
+                            stk.spec.slope.pa_kab,
+                            stk.spec.slope.pa_min,
+                            stk.spec.slope.pa_pse,
+                            stk.spec.slope.pa_ther,
+                            stk.spec.slope.prv,
+                            stk.spec.slope.pspv,
+                            stk.spec.slope.rlo,
+                            stk.spec.slope.sch,
+                            stk.spec.slope.sp_des,
+                            stk.spec.slope.te_bry,
+                            stk.spec.slope.te_mar,
+                            stk.spec.slope.ven)
+write.csv(stk.spec.slope.all, file="data/Stock specific slopes_prev.csv")
+
+##### READ IN DATA FROM FILE
+stspslp <- read.csv("data/Stock specific slopes_prev.csv")
+
+## Extract stock-specific slopes - ic_mul model
+stk.spec.ic_mul <-stspslp[stspslp$agent=="ic_mul",]
+
+ggplot(stk.spec.ic_mul) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_linerange(aes(x = reorder(X, -X50), ymax = X75, ymin = X25), size=1.5, col="gray") +
+  geom_linerange(aes(x = X, ymax = X97.5, ymin = X2.5), col="gray") +
+  geom_linerange(data=stk.spec.ic_mul[stk.spec.ic_mul$X=="Total",], aes(x = X, ymax = X75, ymin = X25), size=2, col="black") +
+  geom_linerange(data=stk.spec.ic_mul[stk.spec.ic_mul$X=="Total",], aes(x = X, ymax = X2.5, ymin = X97.5), col="black") +
+  geom_point(aes(x = X, y = X50), size = 2) +
+  geom_point(data=stk.spec.ic_mul[stk.spec.ic_mul$X=="Total",], aes(x = X, y = X50), size = 3) +
+  labs(x="Stocks", y="Effect size") +
   coord_flip()
-dev.off()
-## Plot Posterior intercepts for Stocks
-post_te_mar_stockint <- post_te_mar[c(1:18) ,]
-ggplot(post_te_mar_stockint) +
-  geom_hline(yintercept = 0, linetype = "dashed")+
-  geom_linerange(aes(x = reorder(X, -X50.), ymax = X75., ymin = X25.), size=1.5, col="gray") +
-  geom_linerange(aes(x = X, ymax = X97.5., ymin = X2.5.), col="gray") +
-  geom_point(aes(x = X, y = X50.), size = 2) +
-  coord_flip()
-## Plot sigma values
-post_te_mar_stocksig <- post_te_mar[grep("igma", post_te_mar$X) ,]
-ggplot(post_te_mar_stocksig) +
-  geom_hline(yintercept = 0, linetype = "dashed")+
-  geom_linerange(aes(x = X, ymax = X75., ymin = X25.), size=1.5, col="gray") +
-  geom_linerange(aes(x = X, ymax = X97.5., ymin = X2.5.), col="gray") +
-  geom_point(aes(x = X, y = X50.), size = 2) +
-  coord_flip()
-## Plot Posterior intercepts for year
-post_te_mar_year <- post_te_mar[grep("b\\[\\(\\Intercept) Year", post_te_mar$X) ,]
-ggplot(post_te_mar_year) +
-  geom_hline(yintercept = 0, linetype = "dashed")+
-  geom_linerange(aes(x = reorder(X, -X50.), ymax = X75., ymin = X25.), size=1.5, col="gray") +
-  geom_linerange(aes(x = X, ymax = X97.5., ymin = X2.5.), col="gray") +
-  geom_point(aes(x = X, y = X50.), size = 2) +
+
+## Plot stock-specific slopes - te_mar
+stk.spec.te_mar <-stspslp[stspslp$agent=="te_mar",]
+ggplot(stk.spec.te_mar) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_linerange(aes(x = reorder(stock, -X50), ymax = X75, ymin = X25), size=1.5, col="gray") +
+  geom_linerange(aes(x = stock, ymax = X97.5, ymin = X2.5), col="gray") +
+  geom_linerange(data=stk.spec.te_mar[stk.spec.te_mar$stock=="Total",], aes(x = stock, ymax = X75, ymin = X25), size=2, col="black") +
+  geom_linerange(data=stk.spec.te_mar[stk.spec.te_mar$stock=="Total",], aes(x = stock, ymax = X2.5, ymin = X97.5), col="black") +
+  geom_point(aes(x = stock, y = X50), size = 2) +
+  geom_point(data=stk.spec.te_mar[stk.spec.te_mar$stock=="Total",], aes(x = stock, y = X50), size = 3) +
+  labs(x="Stocks", y="Effect size") +
   coord_flip()
 
+## Plot stock-specific slopes - pa_ther
+stk.spec.pa_ther <-stspslp[stspslp$agent=="pa_ther",]
+ggplot(stk.spec.pa_ther) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_linerange(aes(x = reorder(stock, -X50), ymax = X75, ymin = X25), size=1.5, col="gray") +
+  geom_linerange(aes(x = stock, ymax = X97.5, ymin = X2.5), col="gray") +
+  geom_linerange(data=stk.spec.pa_ther[stk.spec.pa_ther$stock=="Total",], aes(x = stock, ymax = X75, ymin = X25), size=2, col="black") +
+  geom_linerange(data=stk.spec.pa_ther[stk.spec.pa_ther$stock=="Total",], aes(x = stock, ymax = X2.5, ymin = X97.5), col="black") +
+  geom_point(aes(x = stock, y = X50), size = 2) +
+  geom_point(data=stk.spec.pa_ther[stk.spec.pa_ther$stock=="Total",], aes(x = stock, y = X50), size = 3) +
+  labs(x="Stocks", y="Effect size") +
+  coord_flip()
 
 
-##Examine convergence
-bayesplot::color_scheme_set("green")
-plot(mod.arena2, "rhat")
-plot(mod.arena2, "ess")
-(trace <- plot(mod.arena2, "trace", pars = c("prev_std")))
-
-
-
-
-
-
+#################################################################################
+#################################################################################
 # LOAD - INDEPENDENT MODELS by AGENT
 
 ## Global metric - Independent models
@@ -1087,114 +1104,6 @@ for (i in agents){
 write.csv(param.prop0.load, file="Percent of posterior draws less than 0_load.csv")
 
 #################################################################################
-
-#################################################################################
-## Loop to calculate stock-specific agent estimates - PREVALENCE
-param <- colnames(data.frame(mod.arena2)) #create object of parameters in model
-temp2 <- data.frame(mod.arena2)
-temp3 <- temp2[,grepl("prev",names(temp2))] #include only columns with "prev" in name
-temp4 <- temp3[,-grep("igma",colnames(temp3))] #remove columns with "igma" in name
-temp <- temp4[2001:4000,] #remove warm up iterations
-temp.add <- data.frame(temp[,1] + temp[,2:19]) #add the stock-specific draws to global column
-df <- cbind(temp4[,1], temp.add) #bind with global column
-para_name2 <- colnames(temp4) #create an object with column names
-colnames(df) <- colnames(temp4) #assign names to columns
-
-## Create a matrix and loop
-
-stk.spec.slope <- matrix(NA,
-                         nrow = 19,
-                         ncol = 6,
-                         dimnames = list(para_name2,c("2.5","25","50","75","97.5","agent")))
-
-for(i in agents){
-  model<-get(paste("mod",i, sep="."))
-  temp2 <- data.frame(model)
-  temp3 <- temp2[,grepl("prev",names(temp2))] #include only columns with "prev" in name
-  temp4 <- temp3[,-grep("igma",colnames(temp3))] #remove columns with "igma" in name
-  temp5 <- temp4[2001:4000,] #remove warm up iterations
-  temp6 <- data.frame(temp5[,1] + temp5[,2:19]) #add the stock-specific draws to global column
-  temp7 <- cbind(temp5[,1],temp6) #bind with global column
-  para_name2 <- colnames(temp5) #create an object with column names
-  colnames(temp7) <- colnames(temp5) #assign names to columns
-  nam <- paste("stk.spec.slope", i, sep = ".")
-  temp8 <- as.matrix(apply(temp7, 2, quantile, probs = c(0.025,0.25,0.50,0.75,0.975)))
-  temp9 <- t(temp8)
-  temp10<- as.matrix(cbind(temp9, paste(i)))
-  colnames(temp10) <- c("2.5","25","50","75","97.5","agent") #assign names to columns
-  as.matrix(assign(nam, stk.spec.slope[i] <- temp10))
-}
-
-#### Rbind all posteriors and write as csv
-stk.spec.slope.all <- rbind(stk.spec.slope.arena2,
-                            stk.spec.slope.c_b_cys,
-                            stk.spec.slope.ce_sha,
-                            stk.spec.slope.de_sal,
-                            stk.spec.slope.fa_mar,
-                            stk.spec.slope.fl_psy,
-                            stk.spec.slope.ic_hof,
-                            stk.spec.slope.ic_mul,
-                            stk.spec.slope.ku_thy,
-                            stk.spec.slope.lo_sal,
-                            stk.spec.slope.my_arc,
-                            stk.spec.slope.pa_kab,
-                            stk.spec.slope.pa_min,
-                            stk.spec.slope.pa_pse,
-                            stk.spec.slope.pa_ther,
-                            stk.spec.slope.prv,
-                            stk.spec.slope.pspv,
-                            stk.spec.slope.rlo,
-                            stk.spec.slope.sch,
-                            stk.spec.slope.sp_des,
-                            stk.spec.slope.te_bry,
-                            stk.spec.slope.te_mar,
-                            stk.spec.slope.ven)
-
-write.csv(stk.spec.slope.all, file="Stock specific slopes_prev.csv")
-stspslp<-read.csv("Stock specific slopes_prev.csv")
-
-
-##### READ IN DATA FROM FILE
-stspslp<-read.csv("Stock specific slopes_prev.csv")
-
-## Plot stock-specific slopes - ic_mul
-stk.spec.ic_mul <-stspslp[stspslp$agent=="ic_mul",]
-ggplot(stk.spec.ic_mul) +
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  geom_linerange(aes(x = reorder(stock, -X50), ymax = X75, ymin = X25), size=1.5, col="gray") +
-  geom_linerange(aes(x = stock, ymax = X97.5, ymin = X2.5), col="gray") +
-  geom_linerange(data=stk.spec.ic_mul[stk.spec.ic_mul$stock=="Total",], aes(x = stock, ymax = X75, ymin = X25), size=2, col="black") +
-  geom_linerange(data=stk.spec.ic_mul[stk.spec.ic_mul$stock=="Total",], aes(x = stock, ymax = X2.5, ymin = X97.5), col="black") +
-  geom_point(aes(x = stock, y = X50), size = 2) +
-  geom_point(data=stk.spec.ic_mul[stk.spec.ic_mul$stock=="Total",], aes(x = stock, y = X50), size = 3) +
-  labs(x="Stocks", y="Effect size") +
-  coord_flip()
-
-## Plot stock-specific slopes - te_mar
-stk.spec.te_mar <-stspslp[stspslp$agent=="te_mar",]
-ggplot(stk.spec.te_mar) +
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  geom_linerange(aes(x = reorder(stock, -X50), ymax = X75, ymin = X25), size=1.5, col="gray") +
-  geom_linerange(aes(x = stock, ymax = X97.5, ymin = X2.5), col="gray") +
-  geom_linerange(data=stk.spec.te_mar[stk.spec.te_mar$stock=="Total",], aes(x = stock, ymax = X75, ymin = X25), size=2, col="black") +
-  geom_linerange(data=stk.spec.te_mar[stk.spec.te_mar$stock=="Total",], aes(x = stock, ymax = X2.5, ymin = X97.5), col="black") +
-  geom_point(aes(x = stock, y = X50), size = 2) +
-  geom_point(data=stk.spec.te_mar[stk.spec.te_mar$stock=="Total",], aes(x = stock, y = X50), size = 3) +
-  labs(x="Stocks", y="Effect size") +
-  coord_flip()
-
-## Plot stock-specific slopes - pa_ther
-stk.spec.pa_ther <-stspslp[stspslp$agent=="pa_ther",]
-ggplot(stk.spec.pa_ther) +
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  geom_linerange(aes(x = reorder(stock, -X50), ymax = X75, ymin = X25), size=1.5, col="gray") +
-  geom_linerange(aes(x = stock, ymax = X97.5, ymin = X2.5), col="gray") +
-  geom_linerange(data=stk.spec.pa_ther[stk.spec.pa_ther$stock=="Total",], aes(x = stock, ymax = X75, ymin = X25), size=2, col="black") +
-  geom_linerange(data=stk.spec.pa_ther[stk.spec.pa_ther$stock=="Total",], aes(x = stock, ymax = X2.5, ymin = X97.5), col="black") +
-  geom_point(aes(x = stock, y = X50), size = 2) +
-  geom_point(data=stk.spec.pa_ther[stk.spec.pa_ther$stock=="Total",], aes(x = stock, y = X50), size = 3) +
-  labs(x="Stocks", y="Effect size") +
-  coord_flip()
 
 #################################################################################
 ## Loop to calculate stock-specific agent estimates - LOAD
