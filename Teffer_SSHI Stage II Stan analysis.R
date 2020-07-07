@@ -878,7 +878,7 @@ post_int_slpintsig_load <- rbind(coefs_stan_stk_int_load.arena2,
                                  coefs_stan_stk_year_load.te_bry,
                                  coefs_stan_stk_year_load.te_mar,
                                  coefs_stan_stk_year_load.ven)
-write.csv(post_int_slpintsig_load, file="Posterior distributions_Int Slp Sig_global_indep mod_load.csv")
+write.csv(post_int_slpintsig_load, file="data/Posterior distributions_Int Slp Sig_global_indep mod_load.csv")
 
 #### Rbind all convergence parameters and write as csv
 post_rhatneff_load <- rbind(coefs_stan_stk_rhat_load.arena2,
@@ -928,22 +928,13 @@ post_rhatneff_load <- rbind(coefs_stan_stk_rhat_load.arena2,
                             coefs_stan_stk_neff_load.te_bry,
                             coefs_stan_stk_neff_load.te_mar,
                             coefs_stan_stk_neff_load.ven)
-write.csv(post_rhatneff_load, file="Posterior distributions_Rhat and Neff_global_indep mod_load.csv")
+write.csv(post_rhatneff_load, file="data/Posterior distributions_Rhat and Neff_global_indep mod_load.csv")
 
 #Plot posteriors
-posterior <- as.matrix(mod.load.te_mar)
-plot_title <- ggtitle("Posterior distributions",
-                      "with medians and 80% intervals")
-mcmc_intervals(posterior,
-               prob = 0.8) + plot_title
-summary(mod.load.arena2)[,"Rhat"]
-
-
-
 ## Plot from file
-post_all_load <- read.csv("Posterior distributions_Int Slp Sig_global_indep mod_load.csv")
+post_all_load <- read.csv("data/Posterior distributions_Int Slp Sig_global_indep mod_load.csv")
 post_all_load <- droplevels(post_all_load[!post_all_load$X.1 == "smallUK",])
-post_agents_load <- read.csv("load_coefs_stan_global_indep mod.csv")
+post_agents_load <- read.csv("data/load_coefs_stan_global_indep mod.csv")
 post_agents_load <- droplevels(post_agents_load[!post_agents_load$X == "smallUK",])
 
 ## Plot Posterior for all agents
@@ -988,41 +979,6 @@ ggplot(post_agents_load) +
   theme(axis.text.y = element_text(face = "italic"), plot.title = element_text(hjust = 0.5))+
   coord_flip()
 dev.off()
-
-# Plots for smallUK
-post_smallUK_load <- post_all_load[post_all_load$X.1=="smallUK",]
-## Plot Posterior slopes for Stocks
-post_smallUK_load_stockslp <- post_smallUK_load[grep("load_std Stock", post_smallUK_load$X) ,]
-ggplot(post_smallUK_load_stockslp) +
-  geom_hline(yintercept = 0, linetype = "dashed")+
-  geom_linerange(aes(x = reorder(X, -X50.), ymax = X75., ymin = X25.), size=1.5, col="gray") +
-  geom_linerange(aes(x = X, ymax = X97.5., ymin = X2.5.), col="gray") +
-  geom_point(aes(x = X, y = X50.), size = 2) +
-  coord_flip()
-## Plot Posterior intercepts for Stocks
-post_smallUK_load_stockint <- post_smallUK_load[c(1:18) ,]
-ggplot(post_smallUK_load_stockint) +
-  geom_hline(yintercept = 0, linetype = "dashed")+
-  geom_linerange(aes(x = reorder(X, -X50.), ymax = X75., ymin = X25.), size=1.5, col="gray") +
-  geom_linerange(aes(x = X, ymax = X97.5., ymin = X2.5.), col="gray") +
-  geom_point(aes(x = X, y = X50.), size = 2) +
-  coord_flip()
-## Plot sigma values
-post_smallUK_load_stocksig <- post_smallUK_load[grep("igma", post_smallUK_load$X) ,]
-ggplot(post_smallUK_load_stocksig) +
-  geom_hline(yintercept = 0, linetype = "dashed")+
-  geom_linerange(aes(x = X, ymax = X75., ymin = X25.), size=1.5, col="gray") +
-  geom_linerange(aes(x = X, ymax = X97.5., ymin = X2.5.), col="gray") +
-  geom_point(aes(x = X, y = X50.), size = 2) +
-  coord_flip()
-## Plot Posterior intercepts for year
-post_smallUK_load_year <- post_smallUK_load[grep("b\\[\\(\\Intercept) Year", post_smallUK_load$X) ,]
-ggplot(post_smallUK_load_year) +
-  geom_hline(yintercept = 0, linetype = "dashed")+
-  geom_linerange(aes(x = reorder(X, -X50.), ymax = X75., ymin = X25.), size=1.5, col="gray") +
-  geom_linerange(aes(x = X, ymax = X97.5., ymin = X2.5.), col="gray") +
-  geom_point(aes(x = X, y = X50.), size = 2) +
-  coord_flip()
 
 # Plots for te_mar
 post_te_mar_load <- post_all_load[post_all_load$X.1=="te_mar",]
@@ -1082,7 +1038,7 @@ for (i in agents){
   param.prop0[i,] <- (colSums(model2 < 0))/2000
 }
 
-write.csv(param.prop0, file="Percent of posterior draws less than 0_prev.csv")
+write.csv(param.prop0, file="data/Percent of posterior draws less than 0_prev.csv")
 
 
 ## Loop to derive proportions of posterior draws <0 per model - load
@@ -1099,7 +1055,7 @@ for (i in agents){
   param.prop0.load[i,] <- (colSums(model2 < 0))/2000
 }
 
-write.csv(param.prop0.load, file="Percent of posterior draws less than 0_load.csv")
+write.csv(param.prop0.load, file="data/Percent of posterior draws less than 0_load.csv")
 
 #################################################################################
 
@@ -1165,20 +1121,20 @@ stk.spec.slope.all.load <- rbind(stk.spec.slope.load.arena2,
                                  stk.spec.slope.load.te_mar,
                                  stk.spec.slope.load.ven)
 
-write.csv(stk.spec.slope.all.load, file="Stock specific slopes_load.csv")
+write.csv(stk.spec.slope.all.load, file="data/Stock specific slopes_load.csv")
 
 ##### READ IN DATA FROM FILE
-stspslp.load<-read.csv("Stock specific slopes_load.csv")
+stspslp.load<-read.csv("data/Stock specific slopes_load.csv")
 
 ## Plot stock-specific slopes - te_mar
 stk.spec.te_mar.load <-stspslp.load[stspslp.load$agent=="te_mar",]
 ggplot(stk.spec.te_mar.load) +
   geom_hline(yintercept = 0, linetype = "dashed") +
-  geom_linerange(aes(x = reorder(stock, -X50), ymax = X75, ymin = X25), size=1.5, col="gray") +
-  geom_linerange(aes(x = stock, ymax = X97.5, ymin = X2.5), col="gray") +
-  geom_linerange(data=stk.spec.te_mar.load[stk.spec.te_mar.load$stock=="Total",], aes(x = stock, ymax = X75, ymin = X25), size=2, col="black") +
-  geom_linerange(data=stk.spec.te_mar.load[stk.spec.te_mar.load$stock=="Total",], aes(x = stock, ymax = X2.5, ymin = X97.5), col="black") +
-  geom_point(aes(x = stock, y = X50), size = 2) +
-  geom_point(data=stk.spec.te_mar.load[stk.spec.te_mar.load$stock=="Total",], aes(x = stock, y = X50), size = 3) +
+  geom_linerange(aes(x = reorder(X, -X50), ymax = X75, ymin = X25), size=1.5, col="gray") +
+  geom_linerange(aes(x = X, ymax = X97.5, ymin = X2.5), col="gray") +
+  geom_linerange(data=stk.spec.te_mar.load[stk.spec.te_mar.load$X=="Total",], aes(x = X, ymax = X75, ymin = X25), size=2, col="black") +
+  geom_linerange(data=stk.spec.te_mar.load[stk.spec.te_mar.load$X=="Total",], aes(x = X, ymax = X2.5, ymin = X97.5), col="black") +
+  geom_point(aes(x = X, y = X50), size = 2) +
+  geom_point(data=stk.spec.te_mar.load[stk.spec.te_mar.load$X=="Total",], aes(x = X, y = X50), size = 3) +
   labs(x="Stocks", y="Effect size") +
   coord_flip()
