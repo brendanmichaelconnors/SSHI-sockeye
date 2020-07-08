@@ -418,8 +418,8 @@ post_agents <- read.csv("data/prev_coefs_stan_global_indep mod.csv")
 post_agents <- droplevels(post_agents[!post_agents$X == "smallUK",])
 
 ## Plot Posteriors for all agents
-#tiff('Fig_SSHI ONNE Pathogen Productivity_Agent slopes_Prevalence.tiff', 
-#     units="in", width=5, height=6, res=300)
+jpeg(filename='Fig_SSHI ONNE Pathogen Productivity_Agent slopes_Prevalence.jpg', 
+      width=480, height=500, quality=75)
 ggplot(post_agents) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   geom_linerange(aes(x = reorder(X, -mid), ymax = X75, ymin = X25), size=1.5, col="darkblue") +
@@ -451,7 +451,7 @@ ggplot(post_agents) +
                             "de_sal" = "D. salmonis"))+
   theme(axis.text.y = element_text(face = "italic"), plot.title = element_text(hjust = 0.5))+
   coord_flip()
-#dev.off()
+dev.off()
 
 ## Plots per agent
 #### Extract output from agent model
