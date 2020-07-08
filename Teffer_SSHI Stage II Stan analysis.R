@@ -418,7 +418,7 @@ post_agents <- read.csv("data/prev_coefs_stan_global_indep mod.csv")
 post_agents <- droplevels(post_agents[!post_agents$X == "smallUK",])
 
 ## Plot Posteriors for all agents
-jpeg(filename='Fig_SSHI ONNE Pathogen Productivity_Agent slopes_Prevalence.jpg', 
+jpeg(filename='Figures/Fig_SSHI ONNE Pathogen Productivity_Agent slopes_Prevalence.jpg', 
       width=480, height=500, quality=75)
 ggplot(post_agents) +
   geom_hline(yintercept = 0, linetype = "dashed") +
