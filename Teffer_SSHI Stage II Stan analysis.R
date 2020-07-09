@@ -47,15 +47,19 @@ years <- unique(inf_agt_resid_data_gl$Year)
 samplesperagent.sw<-inf_agt_resid_data_gl %>% 
   group_by(agent, Year) %>%
   summarise(N. = sum(N.))
+jpeg(filename='figs/Fig_Total agent detections by year.jpg', 
+     width=480, height=500, quality=75)
 ggplot(data=samplesperagent.sw, aes(x=reorder(agent, N.), y=N., fill=factor(Year)))+
   geom_bar(stat="identity")+
   coord_flip()+
   xlab("Stock")+
   ylab("sample totals")
+dev.off()
 
 # Plot raw data by: 
 ## Prevalence
-
+jpeg(filename='figs/Fig_Raw data by year_prev.jpg', 
+     width=480, height=500, quality=75)
 ggplot(inf_agt_resid_data_gl,aes(prev, resid_value, color=Stock, shape=factor(Year)))+
   geom_smooth(aes(prev, resid_value, group=Stock), method = "lm", se=F, size=.2)+
   geom_point()+
@@ -64,8 +68,11 @@ ggplot(inf_agt_resid_data_gl,aes(prev, resid_value, color=Stock, shape=factor(Ye
   xlab("prevalence")+
   ylab("residual")+
   theme_bw()
+dev.off()
 
 ## Load
+jpeg(filename='figs/Fig_Raw data by year_load.jpg', 
+     width=480, height=500, quality=75)
 ggplot(inf_agt_resid_data_gl,aes(log10(mean_load), resid_value, color=Stock, shape=factor(Year)))+
   geom_smooth(aes(log10(mean_load), resid_value, group=Stock), method = "lm", se=F, size=.2)+
   geom_point()+
@@ -74,7 +81,7 @@ ggplot(inf_agt_resid_data_gl,aes(log10(mean_load), resid_value, color=Stock, sha
   xlab("log10 load")+
   ylab("residual")+
   theme_bw()
-
+dev.off()
 
 # STAN Approach for Multi-level Modeling
 
