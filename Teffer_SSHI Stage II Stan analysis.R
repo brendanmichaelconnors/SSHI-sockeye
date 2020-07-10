@@ -17,6 +17,16 @@ library(shinystan)
 library(data.table)
 library(base)
 
+left = function(text, num_char) {
+  substr(text, 1, num_char)
+}
+mid = function(text, start_num, num_char) {
+  substr(text, start_num, start_num + num_char - 1)
+}
+right = function(text, num_char) {
+  substr(text, nchar(text) - (num_char-1), nchar(text))
+}
+
 #### Read in data, clean, standardize - SW metric averaged across all stocks each year per agent  
 inf_agt_resid_data_gl <- read.csv("data/global_ONNE_productivity_infection_analysis.csv")
 head(inf_agt_resid_data_gl)
@@ -464,12 +474,12 @@ dev.off()
 #### Extract output from agent model
 post_ic_mul <- post_all[post_all$X.1=="ic_mul",]
 
-## Extract Posterior slopes by Stock
+## Extract Posterior slopes by Stock - ic_mul
 post_ic_mul_stockslp <- post_ic_mul[grep("prev_std Stock", post_ic_mul$X) ,]
 
 #### Plot
-#tiff('Fig_SSHI ONNE Pathogen Productivity_ic_mul prev by stock.tiff', 
-#     units="in", width=5, height=6, res=300)
+jpeg(filename='figs/Fig_SSHI ONNE Pathogen Productivity_ic_mul prev by stock.jpg', 
+     width=480, height=500, quality=75)
 ggplot(post_ic_mul_stockslp) +
   geom_hline(yintercept = 0, linetype = "dashed", col="blue")+
   geom_linerange(aes(x = reorder(X, -X50.), ymax = X75., ymin = X25.), size=1.5, col="black") +
@@ -477,7 +487,7 @@ ggplot(post_ic_mul_stockslp) +
   geom_point(aes(x = X, y = X50.), size = 3) +
   ylim(-0.8,0.8)+
   coord_flip()
-#dev.off()
+dev.off()
 
 ## Extract Posterior intercepts for Stocks - ic_mul example
 post_ic_mul_stockint <- post_ic_mul[c(1:18) ,]
@@ -512,15 +522,6 @@ ggplot(post_ic_mul_year) +
 
 ## Calculate stock-specific Posterior estimates by adding 
 ## stock-specific draws to "global" (averaged across stocks) and then averaging
-param <- colnames(data.frame(mod.arena2)) #create object of parameters using any model
-temp2 <- data.frame(mod.arena2)
-temp3 <- temp2[,grepl("prev",names(temp2))] #include only columns with "prev" in name (posterior slopes/intercepts)
-temp4 <- temp3[,-grep("igma",colnames(temp3))] #remove sigma-related columns 
-temp <- temp4[2001:4000,] #remove warm up iterations
-temp.add <- data.frame(temp[,1] + temp[,2:19]) #add the stock-specific draws to global column
-df <- cbind(temp4[,1], temp.add) #bind with global column
-para_name2 <- colnames(temp4) #create an object with column names
-colnames(df) <- colnames(temp4) #assign names to columns
 
 ## Create a matrix and loop
 stk.spec.slope <- matrix(NA,
@@ -574,54 +575,83 @@ write.csv(stk.spec.slope.all, file="data/Stock specific slopes_prev.csv")
 
 ##### READ IN DATA FROM FILE
 stspslp <- read.csv("data/Stock specific slopes_prev.csv")
+stspslp$stock <- substr(stspslp$X, 18, 28)
+stspslp$stock <- substr(stspslp$stock, 1, nchar(stspslp$stock)-1)
+stspslp$stock <- sub("^$", "Global", stspslp$stock)
 
 ## Extract stock-specific slopes - ic_mul model
 stk.spec.ic_mul <-stspslp[stspslp$agent=="ic_mul",]
 
+## Plot
+jpeg(filename='figs/Fig_SSHI ONNE_stock sp slope_ic_mul.jpg', 
+     width=480, height=500, quality=75)
 ggplot(stk.spec.ic_mul) +
   geom_hline(yintercept = 0, linetype = "dashed") +
-  geom_linerange(aes(x = reorder(X, -X50), ymax = X75, ymin = X25), size=1.5, col="gray") +
-  geom_linerange(aes(x = X, ymax = X97.5, ymin = X2.5), col="gray") +
-  geom_linerange(data=stk.spec.ic_mul[stk.spec.ic_mul$X=="Total",], aes(x = X, ymax = X75, ymin = X25), size=2, col="black") +
-  geom_linerange(data=stk.spec.ic_mul[stk.spec.ic_mul$X=="Total",], aes(x = X, ymax = X2.5, ymin = X97.5), col="black") +
-  geom_point(aes(x = X, y = X50), size = 2) +
-  geom_point(data=stk.spec.ic_mul[stk.spec.ic_mul$X=="Total",], aes(x = X, y = X50), size = 3) +
-  labs(x="Stocks", y="Effect size") +
+  geom_linerange(aes(x = reorder(stock, -X50), ymax = X75, ymin = X25), size=1.5, col="gray") +
+  geom_linerange(aes(x = stock, ymax = X97.5, ymin = X2.5), col="gray") +
+  geom_linerange(data=stk.spec.ic_mul[stk.spec.ic_mul$stock=="Global",], 
+                 aes(x = stock, ymax = X75, ymin = X25), size=2, col="black") +
+  geom_linerange(data=stk.spec.ic_mul[stk.spec.ic_mul$stock=="Global",], 
+                 aes(x = stock, ymax = X2.5, ymin = X97.5), col="black") +
+  geom_point(aes(x = stock, y = X50), size = 2) +
+  geom_point(data=stk.spec.ic_mul[stk.spec.ic_mul$stock=="Global",], aes(x = stock, y = X50), size = 3) +
+  labs(x="Stock", y="Effect size") +
   coord_flip()
+dev.off()
 
 ## Plot stock-specific slopes - te_mar
 stk.spec.te_mar <-stspslp[stspslp$agent=="te_mar",]
+
+## Plot
+jpeg(filename='figs/Fig_SSHI ONNE_stock sp slope_te_mar.jpg', 
+     width=480, height=500, quality=75)
 ggplot(stk.spec.te_mar) +
   geom_hline(yintercept = 0, linetype = "dashed") +
-  geom_linerange(aes(x = reorder(X, -X50), ymax = X75, ymin = X25), size=1.5, col="gray") +
-  geom_linerange(aes(x = X, ymax = X97.5, ymin = X2.5), col="gray") +
-  geom_linerange(data=stk.spec.te_mar[stk.spec.te_mar$X=="Total",], aes(x = X, ymax = X75, ymin = X25), size=2, col="black") +
-  geom_linerange(data=stk.spec.te_mar[stk.spec.te_mar$X=="Total",], aes(x = X, ymax = X2.5, ymin = X97.5), col="black") +
-  geom_point(aes(x = X, y = X50), size = 2) +
-  geom_point(data=stk.spec.te_mar[stk.spec.te_mar$X=="Total",], aes(x = X, y = X50), size = 3) +
-  labs(x="Stocks", y="Effect size") +
+  geom_linerange(aes(x = reorder(stock, -X50), ymax = X75, ymin = X25), size=1.5, col="gray") +
+  geom_linerange(aes(x = stock, ymax = X97.5, ymin = X2.5), col="gray") +
+  geom_linerange(data=stk.spec.te_mar[stk.spec.te_mar$stock=="Global",], 
+                 aes(x = stock, ymax = X75, ymin = X25), size=2, col="black") +
+  geom_linerange(data=stk.spec.te_mar[stk.spec.te_mar$stock=="Global",], 
+                 aes(x = stock, ymax = X2.5, ymin = X97.5), col="black") +
+  geom_point(aes(x = stock, y = X50), size = 2) +
+  geom_point(data=stk.spec.te_mar[stk.spec.te_mar$stock=="Global",], aes(x = stock, y = X50), size = 3) +
+  labs(x="Stock", y="Effect size") +
   coord_flip()
+dev.off()
 
 ## Plot stock-specific slopes - pa_ther
 stk.spec.pa_ther <-stspslp[stspslp$agent=="pa_ther",]
+
+## Plot
+jpeg(filename='figs/Fig_SSHI ONNE_stock sp slope_pa_ther.jpg', 
+     width=480, height=500, quality=75)
 ggplot(stk.spec.pa_ther) +
   geom_hline(yintercept = 0, linetype = "dashed") +
-  geom_linerange(aes(x = reorder(X, -X50), ymax = X75, ymin = X25), size=1.5, col="gray") +
-  geom_linerange(aes(x = X, ymax = X97.5, ymin = X2.5), col="gray") +
-  geom_linerange(data=stk.spec.pa_ther[stk.spec.pa_ther$X=="Total",], aes(x = X, ymax = X75, ymin = X25), size=2, col="black") +
-  geom_linerange(data=stk.spec.pa_ther[stk.spec.pa_ther$X=="Total",], aes(x = X, ymax = X2.5, ymin = X97.5), col="black") +
-  geom_point(aes(x = X, y = X50), size = 2) +
-  geom_point(data=stk.spec.pa_ther[stk.spec.pa_ther$X=="Total",], aes(x = X, y = X50), size = 3) +
-  labs(x="Stocks", y="Effect size") +
+  geom_linerange(aes(x = reorder(stock, -X50), ymax = X75, ymin = X25), size=1.5, col="gray") +
+  geom_linerange(aes(x = stock, ymax = X97.5, ymin = X2.5), col="gray") +
+  geom_linerange(data=stk.spec.pa_ther[stk.spec.pa_ther$stock=="Global",], 
+                 aes(x = stock, ymax = X75, ymin = X25), size=2, col="black") +
+  geom_linerange(data=stk.spec.pa_ther[stk.spec.pa_ther$stock=="Global",], 
+                 aes(x = stock, ymax = X2.5, ymin = X97.5), col="black") +
+  geom_point(aes(x = stock, y = X50), size = 2) +
+  geom_point(data=stk.spec.pa_ther[stk.spec.pa_ther$stock=="Global",], aes(x = stock, y = X50), size = 3) +
+  labs(x="Stock", y="Effect size") +
   coord_flip()
+dev.off()
+
+
+
+
+
+
+
 
 
 #################################################################################
 #################################################################################
 # LOAD - INDEPENDENT MODELS by AGENT
-###STILL WORKING ON LOAD CODE###
 
-## Global metric - Independent models
+## Global SW metric - Independent models
 
 ### Loop for STAN independent models
 for(i in agents){
@@ -989,6 +1019,7 @@ dev.off()
 
 # Plots for te_mar
 post_te_mar_load <- post_all_load[post_all_load$X.1=="te_mar",]
+
 ## Plot Posterior slopes for Stocks
 post_te_mar_load_stockslp <- post_te_mar_load[grep("load_std Stock", post_te_mar_load$X) ,]
 tiff('Fig_SSHI ONNE Pathogen Productivity_te_mar load by stock.tiff', 
@@ -1028,10 +1059,8 @@ ggplot(post_te_mar_load_year) +
   coord_flip()
 
 
-
-
 #################################################################################
-## Loop to derive proportions of posterior draws <0 per model - prevalence
+## Derive proportions of posterior draws <0 per model - prevalence
 param<-colnames(data.frame(mod.arena2)) #create object of parameters in model
 
 param.prop0 <- matrix(NA,
@@ -1048,7 +1077,7 @@ for (i in agents){
 write.csv(param.prop0, file="data/Percent of posterior draws less than 0_prev.csv")
 
 
-## Loop to derive proportions of posterior draws <0 per model - load
+## Derive proportions of posterior draws <0 per model - load
 param.load<-colnames(data.frame(mod.load.arena2)) #create object of parameters in model
 
 param.prop0.load <- matrix(NA,
@@ -1065,21 +1094,10 @@ for (i in agents){
 write.csv(param.prop0.load, file="data/Percent of posterior draws less than 0_load.csv")
 
 #################################################################################
-
 #################################################################################
-## Loop to calculate stock-specific agent estimates - LOAD
-param <- colnames(data.frame(mod.load.arena2)) #create object of parameters in model
-temp2 <- data.frame(mod.load.arena2)
-temp3 <- temp2[,grepl("load",names(temp2))] #include only columns with "prev" in name
-temp4 <- temp3[,-grep("igma",colnames(temp3))] #remove columns with "igma" in name
-temp <- temp4[2001:4000,] #remove warm up iterations
-temp.add <- data.frame(temp[,1] + temp[,2:19]) #add the stock-specific draws to global column
-df <- cbind(temp4[,1], temp.add) #bind with global column
-para_name2 <- colnames(temp4) #create an object with column names
-colnames(df) <- colnames(temp4) #assign names to columns
+## Calculate stock-specific agent estimates - LOAD
 
 ## Create a matrix and loop
-
 stk.spec.slope.load <- matrix(NA,
                               nrow = 19,
                               ncol = 6,
@@ -1130,18 +1148,24 @@ stk.spec.slope.all.load <- rbind(stk.spec.slope.load.arena2,
 
 write.csv(stk.spec.slope.all.load, file="data/Stock specific slopes_load.csv")
 
+
 ##### READ IN DATA FROM FILE
 stspslp.load<-read.csv("data/Stock specific slopes_load.csv")
+stspslp.load$stock <- substr(stspslp.load$X, 18, 28)
+stspslp.load$stock <- substr(stspslp.load$stock, 1, nchar(stspslp.load$stock)-1)
+stspslp.load$stock <- sub("^$", "Global", stspslp.load$stock)
 
 ## Plot stock-specific slopes - te_mar
 stk.spec.te_mar.load <-stspslp.load[stspslp.load$agent=="te_mar",]
 ggplot(stk.spec.te_mar.load) +
   geom_hline(yintercept = 0, linetype = "dashed") +
-  geom_linerange(aes(x = reorder(X, -X50), ymax = X75, ymin = X25), size=1.5, col="gray") +
-  geom_linerange(aes(x = X, ymax = X97.5, ymin = X2.5), col="gray") +
-  geom_linerange(data=stk.spec.te_mar.load[stk.spec.te_mar.load$X=="Total",], aes(x = X, ymax = X75, ymin = X25), size=2, col="black") +
-  geom_linerange(data=stk.spec.te_mar.load[stk.spec.te_mar.load$X=="Total",], aes(x = X, ymax = X2.5, ymin = X97.5), col="black") +
-  geom_point(aes(x = X, y = X50), size = 2) +
-  geom_point(data=stk.spec.te_mar.load[stk.spec.te_mar.load$X=="Total",], aes(x = X, y = X50), size = 3) +
-  labs(x="Stocks", y="Effect size") +
+  geom_linerange(aes(x = reorder(stock, -X50), ymax = X75, ymin = X25), size=1.5, col="gray") +
+  geom_linerange(aes(x = stock, ymax = X97.5, ymin = X2.5), col="gray") +
+  geom_linerange(data=stk.spec.te_mar[stk.spec.te_mar$stock=="Global",], 
+                 aes(x = stock, ymax = X75, ymin = X25), size=2, col="black") +
+  geom_linerange(data=stk.spec.te_mar[stk.spec.te_mar$stock=="Global",], 
+                 aes(x = stock, ymax = X2.5, ymin = X97.5), col="black") +
+  geom_point(aes(x = stock, y = X50), size = 2) +
+  geom_point(data=stk.spec.te_mar[stk.spec.te_mar$stock=="Global",], aes(x = stock, y = X50), size = 3) +
+  labs(x="Stock", y="Effect size") +
   coord_flip()
