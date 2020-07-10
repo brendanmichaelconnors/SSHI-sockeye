@@ -215,6 +215,20 @@ ggplot(sw.data,aes(Latitude, log10(pa_ther), shape=Zone, color=factor(Year))) +
   geom_point() +
   geom_smooth(aes(Latitude, log10(pa_ther)), method = "lm", se=F, size=.2) 
 
-
+# examine temperature correlation
 pa_ther.sst <- merge(all.pa_ther.sw, sst, by = c("Stock_Analysis", "Year"))
+ggplot(pa_ther.sst,aes(sst_anom, log10(mean_load), color=factor(brood_year))) +
+  geom_point() 
+ggplot(pa_ther.sst,aes(sst_anom, log10(mean_load), color=Stock_Analysis)) +
+  geom_point() 
+
+ggplot(pa_ther.sst,aes(sst_anom, prev, color=factor(brood_year))) +
+  geom_point() 
+
+jpeg(filename='figs/Fig_pa_ther prev corr w SST by stock.jpg', 
+     width=480, height=600, quality=75)
+ggplot(pa_ther.sst,aes(sst_anom, prev, color=Stock_Analysis)) +
+  geom_point() +
+  geom_smooth(aes(sst_anom, prev), method = "lm", se=F, size=.2) 
+dev.off()
 
