@@ -40,9 +40,9 @@ inf_agt_resid_data_gl$Stock <- inf_agt_resid_data_gl$Stock_Analysis
 head(inf_agt_resid_data_gl)
 
 
-#Bring in infection data without LOD
-all<-read.csv("ONNE metadata no LOD_3.27.2019.csv",header=TRUE)
-all2<-droplevels(all[!(all$Stock_Region=="") ,])#remove any fish without stock assignment for now
+#Bring in pathogen data without LOD and clean
+all <- read.csv("data/ONNE metadata no LOD_3.27.2019.csv",header=TRUE)
+all2 <- droplevels(all[!(all$Stock_Region=="") ,])#remove any fish without stock assignment for now
 #take out rare stock regions and no stock ID
 temp2<-droplevels(all2[-which(all2$Stock_Area=="Northern") ,]) #Northern out
 dim(temp2)
@@ -53,7 +53,9 @@ dim(major)
 #only major stock regions sampled in SW
 sw.major<-droplevels(major[(major$SWFW=="SW") ,])#SW only major
 str(sw.major)
-#Reduce temporal limit to spring and summer, remove samples from WCVI, 2018 and high latitudes (>51.5 lat) 
+fw.major<-droplevels(major[(major$SWFW=="FW") ,])#FW only major
+str(fw.data)
+#Reduce temporal period to spring-summer, remove samples from WCVI, 2018 and high latitudes (>51.5 lat) 
 spsu1<-droplevels(sw.major[-which(sw.major$SEASON1=="Overwinter") ,]) #remove winter 
 dim(spsu1)
 spsu2<-droplevels(spsu1[-which(spsu1$SEASON1=="Fall") ,]) # remove fall 
@@ -62,61 +64,43 @@ spsu3<-droplevels(spsu2[-which(spsu2$Zone=="WCVI") ,]) #remove WCVI
 dim(spsu3)
 spsu4<-droplevels(spsu3[-which(spsu3$Year=="2018") ,]) #remove 2018 
 dim(spsu4)
-spsu<-droplevels(spsu4[-which(spsu4$Latitude>51.5) ,]) # remove high latitude samples
+spsu<-droplevels(spsu4[-which(spsu4$Latitude > 51.5) ,]) # remove high latitude samples
 dim(spsu)
 #Change stock names
 levels(spsu$Stock_Analysis)[levels(spsu$Stock_Analysis)=="Early Stuart"] <- "E.Stuart"
 levels(spsu$Stock_Analysis)[levels(spsu$Stock_Analysis)=="Late Shuswap"] <- "L.Shuswap"
 levels(spsu$Stock_Analysis)[levels(spsu$Stock_Analysis)=="Harrison-Widgeon"] <- "Harrison"
-
+sw.data <- spsu #rename
+levels(fw.major$Stock_Analysis)[levels(fw.major$Stock_Analysis)=="Early Stuart"] <- "E.Stuart"
+levels(fw.major$Stock_Analysis)[levels(fw.major$Stock_Analysis)=="Late Shuswap"] <- "L.Shuswap"
+levels(fw.major$Stock_Analysis)[levels(fw.major$Stock_Analysis)=="Harrison-Widgeon"] <- "Harrison"
+fw.data <- fw.major #rename
 
 # Create "agent" object
 agents <- unique(inf_agt_resid_data_gl$agent)
 
-# Plot total detections of each agent by year - note variable prevalence across agents and years
-samplesperagent.sw<-inf_agt_resid_data_gl %>% 
-  group_by(agent, Year) %>%
-  summarise(N. = sum(N.))
-ggplot(data=samplesperagent.sw, aes(x=reorder(agent, N.), y=N., fill=factor(Year)))+
-  geom_bar(stat="identity")+
-  coord_flip()+
-  xlab("Stock")+
-  ylab("sample totals")
+#Bring in truncated resdiduals
+trnc_resid<-read.csv("data/survival_indices_truncated.csv", head=TRUE)
+str(trnc_resid)
+trnc_resid$Year <- trnc_resid$brood_year+2
+names(trnc_resid) <- c("orderID", "Stock_Analysis", "brood_year", "metric", "resid_value", "Year") #rename columns
+##create object with just SRR_resid metric to align with infection data
+trnc_resid_srr <- trnc_resid[trnc_resid$metric=="SR_resid",]
 
-# Plot raw data by: 
-## Prevalence
-ggplot(inf_agt_resid_data_gl,aes(prev, resid_value, color=Stock, shape=factor(Year)))+
-  geom_smooth(aes(prev, resid_value, group=Stock), method = "lm", se=F, size=.2)+
-  geom_point()+
-  scale_shape_manual(values=1:nlevels(factor(inf_agt_resid_data_gl$Year))) +
-  facet_wrap(~ agent,nrow=5, scales = "free")+
-  xlab("prevalence")+
-  ylab("residual")+
-  theme_bw()
-
-## Load
-ggplot(inf_agt_resid_data_gl,aes(log10(mean_load), resid_value, color=Stock, shape=factor(Year)))+
-  geom_smooth(aes(log10(mean_load), resid_value, group=Stock), method = "lm", se=F, size=.2)+
-  geom_point()+
-  scale_shape_manual(values=1:nlevels(factor(inf_agt_resid_data_gl$Year))) +
-  facet_wrap(~ agent,nrow=5, scales="free")+
-  xlab("log10 load")+
-  ylab("residual")+
-  theme_bw()
 
 
 # Investigate variability of agents by Latitude
 #CODE IN PROCESS#
 
 ## Plot raw agent data by latitude
-### In spsu, calculate count/sampled per year
+### In sw.data, calculate count/sampled per year
 
-spsu.year <-spsu %>% group_by(Year) #create object to be summarized by year
+sw.data.year <-sw.data %>% group_by(Year) #create object to be summarized by year
 
 ##ic_mul
 all.ic_mul.sw =
   data.frame(
-    spsu.year %>% 
+    sw.data.year %>% 
       summarise(
         mean(Latitude[Latitude!=0], na.rm=TRUE),
         min(Latitude[Latitude!=0], na.rm=TRUE),
@@ -133,13 +117,90 @@ all.ic_mul.sw$brood_year<-all.ic_mul.sw$Year-2
 
 ggplot(all.ic_mul.sw,aes(prev, Latitude, color=factor(brood_year))) +
   geom_point() +
-  geom_linerange(aes(ymin = minLat, ymax = maxLat)) +
-  coord_flip()
-ggplot(all.ic_mul.sw,aes(Latitude, brood_year)) +
-  geom_point()
+  geom_linerange(aes(ymin = minLat, ymax = maxLat))
 
-ggplot(spsu,aes(Latitude, log10(ic_mul), shape=Zone, color=factor(Year))) +
+ggplot(sw.data,aes(Latitude, log10(ic_mul), shape=Zone, color=factor(Year))) +
   geom_point() +
   geom_smooth(aes(Latitude, log10(ic_mul)), method = "lm", se=F, size=.2) 
 
+
+## ic_mul FW influence
+fw.data.year <-fw.data %>% group_by(Year) #create object to be summarized by year
+
+all.ic_mul.fw =
+  data.frame(
+    fw.data.year %>% 
+      summarise(
+        length(which(ic_mul!="NA")), #samples
+        length(which(ic_mul>0)), #positive detections
+        length(which(ic_mul>0))/length(which(!is.na(ic_mul))),  #calculates prevalence
+        mean(ic_mul[ic_mul!=0], na.rm=TRUE),
+        (length(which(ic_mul>0)) / length(which(!is.na(ic_mul)))) * mean(ic_mul[ic_mul!=0], na.rm=TRUE)
+      )
+  )
+names(all.ic_mul.fw) <- c("Year", "N", "N+", "prev", "mean_load", "prevload") #rename columns
+all.ic_mul.fw$brood_year <- all.ic_mul.fw$Year-2
+ic_mul.resid.fw <- merge(trnc_resid_srr, all.ic_mul.fw, by = c("brood_year", "Year"))
+
+jpeg(filename='figs/Fig_ic_mul FW prev corr w SR resid.jpg', 
+     width=480, height=600, quality=75)
+ggplot(ic_mul.resid.fw, aes(prev, resid_value, color=Stock_Analysis)) +
+  geom_point(aes(color=Stock_Analysis)) +
+  geom_smooth(aes(prev, resid_value), method = "lm", se=F, size=.2) +
+  labs(y = "SR residuals",x = "Prevalence (ic_mul)")
+dev.off()
+
+
+
+## te_mar
+all.te_mar.sw =
+  data.frame(
+    sw.data.year %>% 
+      summarise(
+        mean(Latitude[Latitude!=0], na.rm=TRUE),
+        min(Latitude[Latitude!=0], na.rm=TRUE),
+        max(Latitude[Latitude!=0], na.rm=TRUE),
+        length(which(te_mar!="NA")), #samples
+        length(which(te_mar>0)), #positive detections
+        length(which(te_mar>0))/length(which(!is.na(te_mar))),  #calculates prevalence
+        mean(te_mar[te_mar!=0], na.rm=TRUE),
+        (length(which(te_mar>0)) / length(which(!is.na(te_mar)))) * mean(te_mar[te_mar!=0], na.rm=TRUE)
+      )
+  )
+names(all.te_mar.sw) <- c("Year", "Latitude", "minLat", "maxLat", "N", "N+", "prev", "mean_load", "prevload") #rename columns
+all.te_mar.sw$brood_year<-all.te_mar.sw$Year-2
+
+ggplot(all.te_mar.sw,aes(prev, Latitude, color=factor(brood_year))) +
+  geom_point() +
+  geom_linerange(aes(ymin = minLat, ymax = maxLat))
+
+ggplot(sw.data,aes(Latitude, log10(te_mar), shape=Zone, color=factor(Year))) +
+  geom_point() +
+  geom_smooth(aes(Latitude, log10(te_mar)), method = "lm", se=F, size=.2) 
+
+##pa_ther
+all.pa_ther.sw =
+  data.frame(
+    sw.data.year %>% 
+      summarise(
+        mean(Latitude[Latitude!=0], na.rm=TRUE),
+        min(Latitude[Latitude!=0], na.rm=TRUE),
+        max(Latitude[Latitude!=0], na.rm=TRUE),
+        length(which(pa_ther!="NA")), #samples
+        length(which(pa_ther>0)), #positive detections
+        length(which(pa_ther>0))/length(which(!is.na(pa_ther))),  #calculates prevalence
+        mean(pa_ther[pa_ther!=0], na.rm=TRUE),
+        (length(which(pa_ther>0)) / length(which(!is.na(pa_ther)))) * mean(pa_ther[pa_ther!=0], na.rm=TRUE)
+      )
+  )
+names(all.pa_ther.sw) <- c("Year", "Latitude", "minLat", "maxLat", "N", "N+", "prev", "mean_load", "prevload") #rename columns
+all.pa_ther.sw$brood_year<-all.pa_ther.sw$Year-2
+
+ggplot(all.pa_ther.sw,aes(prev, Latitude, color=factor(brood_year))) +
+  geom_point() +
+  geom_linerange(aes(ymin = minLat, ymax = maxLat))
+
+ggplot(sw.data,aes(Latitude, log10(pa_ther), shape=Zone, color=factor(Year))) +
+  geom_point() +
+  geom_smooth(aes(Latitude, log10(pa_ther)), method = "lm", se=F, size=.2) 
 
