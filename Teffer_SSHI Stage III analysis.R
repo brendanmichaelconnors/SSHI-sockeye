@@ -76,6 +76,9 @@ levels(fw.major$Stock_Analysis)[levels(fw.major$Stock_Analysis)=="Late Shuswap"]
 levels(fw.major$Stock_Analysis)[levels(fw.major$Stock_Analysis)=="Harrison-Widgeon"] <- "Harrison"
 fw.data <- fw.major #rename
 
+sst <- read.csv("data/SST anomalies ONNE by Stock.csv")
+names(sst) <- c("Year", "Stock_Analysis", "sst_anom")
+
 # Create "agent" object
 agents <- unique(inf_agt_resid_data_gl$agent)
 
@@ -173,12 +176,20 @@ all.te_mar.sw$brood_year<-all.te_mar.sw$Year-2
 ggplot(all.te_mar.sw,aes(prev, Latitude, color=factor(brood_year))) +
   geom_point() +
   geom_linerange(aes(ymin = minLat, ymax = maxLat))
-
 ggplot(sw.data,aes(Latitude, log10(te_mar), shape=Zone, color=factor(Year))) +
   geom_point() +
   geom_smooth(aes(Latitude, log10(te_mar)), method = "lm", se=F, size=.2) 
 
+ggplot(sw.data, aes(Latitude, log10(te_mar))) +
+  geom_point() 
+#See maps in GitHub - te_mar detections centeres in northern SOG, DI, JS
+#Possible migration conditions, density (transmission), or exposure to farmed salmon (if te_mar an issue)
+#generally low prevalence agent
+
+
 ##pa_ther
+sw.data.year.st <-sw.data %>% group_by(Year, Stock_Analysis) #create object to be summarized by year
+
 all.pa_ther.sw =
   data.frame(
     sw.data.year %>% 
@@ -193,7 +204,7 @@ all.pa_ther.sw =
         (length(which(pa_ther>0)) / length(which(!is.na(pa_ther)))) * mean(pa_ther[pa_ther!=0], na.rm=TRUE)
       )
   )
-names(all.pa_ther.sw) <- c("Year", "Latitude", "minLat", "maxLat", "N", "N+", "prev", "mean_load", "prevload") #rename columns
+names(all.pa_ther.sw) <- c("Year", "Stock_Analysis", "Latitude", "minLat", "maxLat", "N", "N+", "prev", "mean_load", "prevload") #rename columns
 all.pa_ther.sw$brood_year<-all.pa_ther.sw$Year-2
 
 ggplot(all.pa_ther.sw,aes(prev, Latitude, color=factor(brood_year))) +
@@ -203,4 +214,7 @@ ggplot(all.pa_ther.sw,aes(prev, Latitude, color=factor(brood_year))) +
 ggplot(sw.data,aes(Latitude, log10(pa_ther), shape=Zone, color=factor(Year))) +
   geom_point() +
   geom_smooth(aes(Latitude, log10(pa_ther)), method = "lm", se=F, size=.2) 
+
+
+pa_ther.sst <- merge(all.pa_ther.sw, sst, by = c("Stock_Analysis", "Year"))
 
