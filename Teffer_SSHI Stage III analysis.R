@@ -147,7 +147,7 @@ jpeg(filename='figs/Fig_ic_mul FW prev corr w SR resid.jpg',
 ggplot(ic_mul.resid.fw, aes(prev, resid_value, color=Stock_Analysis)) +
   geom_point(aes(color=Stock_Analysis)) +
   geom_smooth(aes(prev, resid_value), method = "lm", se=F, size=.2) +
-  labs(y = "SR residuals",x = "Prevalence (ic_mul)")
+  labs(y = "SR residuals",x = "FW Prevalence by Year (ic_mul)")
 dev.off()
 
 
