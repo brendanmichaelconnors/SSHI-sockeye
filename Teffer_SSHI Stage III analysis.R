@@ -39,6 +39,37 @@ inf_agt_resid_data_gl$load_std <- inf_std[,3]
 inf_agt_resid_data_gl$Stock <- inf_agt_resid_data_gl$Stock_Analysis
 head(inf_agt_resid_data_gl)
 
+
+#Bring in infection data without LOD
+all<-read.csv("ONNE metadata no LOD_3.27.2019.csv",header=TRUE)
+all2<-droplevels(all[!(all$Stock_Region=="") ,])#remove any fish without stock assignment for now
+#take out rare stock regions and no stock ID
+temp2<-droplevels(all2[-which(all2$Stock_Area=="Northern") ,]) #Northern out
+dim(temp2)
+temp3<-droplevels(temp2[-which(temp2$Stock_Area=="QCI") ,]) #QCI out
+dim(temp3)
+major<-droplevels(temp3[-which(temp3$Stock_Area=="TransBoundary") ,]) #Transboundary out
+dim(major)
+#only major stock regions sampled in SW
+sw.major<-droplevels(major[(major$SWFW=="SW") ,])#SW only major
+str(sw.major)
+#Reduce temporal limit to spring and summer, remove samples from WCVI, 2018 and high latitudes (>51.5 lat) 
+spsu1<-droplevels(sw.major[-which(sw.major$SEASON1=="Overwinter") ,]) #remove winter 
+dim(spsu1)
+spsu2<-droplevels(spsu1[-which(spsu1$SEASON1=="Fall") ,]) # remove fall 
+dim(spsu2) ##spsu is only spring and summer
+spsu3<-droplevels(spsu2[-which(spsu2$Zone=="WCVI") ,]) #remove WCVI 
+dim(spsu3)
+spsu4<-droplevels(spsu3[-which(spsu3$Year=="2018") ,]) #remove 2018 
+dim(spsu4)
+spsu<-droplevels(spsu4[-which(spsu4$Latitude>51.5) ,]) # remove high latitude samples
+dim(spsu)
+#Change stock names
+levels(spsu$Stock_Analysis)[levels(spsu$Stock_Analysis)=="Early Stuart"] <- "E.Stuart"
+levels(spsu$Stock_Analysis)[levels(spsu$Stock_Analysis)=="Late Shuswap"] <- "L.Shuswap"
+levels(spsu$Stock_Analysis)[levels(spsu$Stock_Analysis)=="Harrison-Widgeon"] <- "Harrison"
+
+
 # Create "agent" object
 agents <- unique(inf_agt_resid_data_gl$agent)
 
@@ -54,7 +85,6 @@ ggplot(data=samplesperagent.sw, aes(x=reorder(agent, N.), y=N., fill=factor(Year
 
 # Plot raw data by: 
 ## Prevalence
-
 ggplot(inf_agt_resid_data_gl,aes(prev, resid_value, color=Stock, shape=factor(Year)))+
   geom_smooth(aes(prev, resid_value, group=Stock), method = "lm", se=F, size=.2)+
   geom_point()+
@@ -80,7 +110,7 @@ ggplot(inf_agt_resid_data_gl,aes(log10(mean_load), resid_value, color=Stock, sha
 
 ## Plot raw agent data by latitude
 ### In spsu, calculate count/sampled per year
-ic_mul.spsu<-spsu[spsu]
+
 spsu.year <-spsu %>% group_by(Year) #create object to be summarized by year
 
 ##ic_mul

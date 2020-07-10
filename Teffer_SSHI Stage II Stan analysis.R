@@ -1137,6 +1137,7 @@ stspslp.load$stock <- sub("^$", "Global", stspslp.load$stock)
 
 ## Plot stock-specific slopes - te_mar
 stk.spec.te_mar.load <-stspslp.load[stspslp.load$agent=="te_mar",]
+
 ## Plot
 jpeg(filename='figs/Fig_SSHI ONNE stock sp slope_te_mar_load.jpg', 
      width=480, height=500, quality=75)
