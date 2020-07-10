@@ -581,7 +581,6 @@ stspslp$stock <- sub("^$", "Global", stspslp$stock)
 
 ## Extract stock-specific slopes - ic_mul model
 stk.spec.ic_mul <-stspslp[stspslp$agent=="ic_mul",]
-
 ## Plot
 jpeg(filename='figs/Fig_SSHI ONNE_stock sp slope_ic_mul.jpg', 
      width=480, height=500, quality=75)
@@ -601,7 +600,6 @@ dev.off()
 
 ## Plot stock-specific slopes - te_mar
 stk.spec.te_mar <-stspslp[stspslp$agent=="te_mar",]
-
 ## Plot
 jpeg(filename='figs/Fig_SSHI ONNE_stock sp slope_te_mar.jpg', 
      width=480, height=500, quality=75)
@@ -621,7 +619,6 @@ dev.off()
 
 ## Plot stock-specific slopes - pa_ther
 stk.spec.pa_ther <-stspslp[stspslp$agent=="pa_ther",]
-
 ## Plot
 jpeg(filename='figs/Fig_SSHI ONNE_stock sp slope_pa_ther.jpg', 
      width=480, height=500, quality=75)
@@ -639,8 +636,19 @@ ggplot(stk.spec.pa_ther) +
   coord_flip()
 dev.off()
 
+## Derive proportions of posterior draws <0 per model - prevalence
+param<-colnames(data.frame(mod.arena2)) #create object of parameters in model
+param.prop0 <- matrix(NA,
+                      ncol = length(param),
+                      nrow = length(agents),
+                      dimnames = list(agents,param))
 
-
+for (i in agents){
+  model<-as.matrix(get(paste("mod.",i, sep="")))
+  model2<-model[2001:4000,]
+  param.prop0[i,] <- (colSums(model2 < 0))/2000
+}
+write.csv(param.prop0, file="data/Percent of posterior draws less than 0_prev.csv")
 
 
 
@@ -975,15 +983,8 @@ post_agents_load <- read.csv("data/load_coefs_stan_global_indep mod.csv")
 post_agents_load <- droplevels(post_agents_load[!post_agents_load$X == "smallUK",])
 
 ## Plot Posterior for all agents
-ggplot(post_agents_load) +
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  geom_linerange(aes(x = reorder(X, -mid), ymax = X75, ymin = X25), size=1.5, col="gray") +
-  geom_linerange(aes(x = X, ymax = upper, ymin = lower), col="gray") +
-  geom_point(aes(x = X, y = mid), size = 2)+
-  coord_flip()
-
-tiff('Fig_SSHI ONNE Pathogen Productivity_Agent slopes_Load.tiff', 
-     units="in", width=5, height=6, res=300)
+jpeg(filename='figs/Fig_SSHI ONNE Pathogen Productivity_Agent slopes_Load.jpg', 
+     width=480, height=500, quality=75)
 ggplot(post_agents_load) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   geom_linerange(aes(x = reorder(X, -mid), ymax = X75, ymin = X25), size=1.5, col="darkblue") +
@@ -1022,8 +1023,6 @@ post_te_mar_load <- post_all_load[post_all_load$X.1=="te_mar",]
 
 ## Plot Posterior slopes for Stocks
 post_te_mar_load_stockslp <- post_te_mar_load[grep("load_std Stock", post_te_mar_load$X) ,]
-tiff('Fig_SSHI ONNE Pathogen Productivity_te_mar load by stock.tiff', 
-     units="in", width=5, height=6, res=300)
 ggplot(post_te_mar_load_stockslp) +
   geom_hline(yintercept = 0, linetype = "dashed", col="blue")+
   geom_linerange(aes(x = reorder(X, -X50.), ymax = X75., ymin = X25.), size=1.5, col="black") +
@@ -1031,8 +1030,6 @@ ggplot(post_te_mar_load_stockslp) +
   geom_point(aes(x = X, y = X50.), size = 3) +
   ylim(-0.8,0.8)+
   coord_flip()
-dev.off()
-
 ## Plot Posterior intercepts for Stocks
 post_te_mar_load_stockint <- post_te_mar_load[c(1:18) ,]
 ggplot(post_te_mar_load_stockint) +
@@ -1059,24 +1056,8 @@ ggplot(post_te_mar_load_year) +
   coord_flip()
 
 
+
 #################################################################################
-## Derive proportions of posterior draws <0 per model - prevalence
-param<-colnames(data.frame(mod.arena2)) #create object of parameters in model
-
-param.prop0 <- matrix(NA,
-                      ncol = length(param),
-                      nrow = length(agents),
-                      dimnames = list(agents,param))
-
-for (i in agents){
-  model<-as.matrix(get(paste("mod.",i, sep="")))
-  model2<-model[2001:4000,]
-  param.prop0[i,] <- (colSums(model2 < 0))/2000
-}
-
-write.csv(param.prop0, file="data/Percent of posterior draws less than 0_prev.csv")
-
-
 ## Derive proportions of posterior draws <0 per model - load
 param.load<-colnames(data.frame(mod.load.arena2)) #create object of parameters in model
 
@@ -1090,7 +1071,6 @@ for (i in agents){
   model2<-model[2001:4000,]
   param.prop0.load[i,] <- (colSums(model2 < 0))/2000
 }
-
 write.csv(param.prop0.load, file="data/Percent of posterior draws less than 0_load.csv")
 
 #################################################################################
@@ -1157,6 +1137,9 @@ stspslp.load$stock <- sub("^$", "Global", stspslp.load$stock)
 
 ## Plot stock-specific slopes - te_mar
 stk.spec.te_mar.load <-stspslp.load[stspslp.load$agent=="te_mar",]
+## Plot
+jpeg(filename='figs/Fig_SSHI ONNE stock sp slope_te_mar_load.jpg', 
+     width=480, height=500, quality=75)
 ggplot(stk.spec.te_mar.load) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   geom_linerange(aes(x = reorder(stock, -X50), ymax = X75, ymin = X25), size=1.5, col="gray") +
@@ -1169,3 +1152,5 @@ ggplot(stk.spec.te_mar.load) +
   geom_point(data=stk.spec.te_mar[stk.spec.te_mar$stock=="Global",], aes(x = stock, y = X50), size = 3) +
   labs(x="Stock", y="Effect size") +
   coord_flip()
+dev.off()
+
