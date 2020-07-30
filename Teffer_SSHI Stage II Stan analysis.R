@@ -16,16 +16,8 @@ theme_set(bayesplot::theme_default(base_family = "sans"))
 library(shinystan)
 library(data.table)
 library(base)
-
-left = function(text, num_char) {
-  substr(text, 1, num_char)
-}
-mid = function(text, start_num, num_char) {
-  substr(text, start_num, start_num + num_char - 1)
-}
-right = function(text, num_char) {
-  substr(text, nchar(text) - (num_char-1), nchar(text))
-}
+library(ggpubr)
+library(dplyr)
 
 #### Read in data, clean, standardize - SW metric averaged across all stocks each year per agent  
 inf_agt_resid_data_gl <- read.csv("data/global_ONNE_productivity_infection_analysis.csv")
@@ -44,9 +36,34 @@ inf_std <- plyr::ddply(inf_agt_resid_data_gl, c("agent"),function(x) {
 inf_agt_resid_data_gl$prev_std <- inf_std[,2]
 inf_agt_resid_data_gl$load_std <- inf_std[,3]
 
-# Add Stock column to update later
+# Add Stock column, remove smallUK, add plot.agent column (full name)
 inf_agt_resid_data_gl$Stock <- inf_agt_resid_data_gl$Stock_Analysis
-head(inf_agt_resid_data_gl)
+inf_agt_resid_data_gl <- droplevels(inf_agt_resid_data_gl[inf_agt_resid_data_gl$agent!="smallUK",])
+inf_agt_resid_data_gl$plot.agent <- inf_agt_resid_data_gl$agent
+inf_agt_resid_data_gl$plot.agent <- recode(inf_agt_resid_data_gl$plot.agent, "ic_mul" = "I. multifiliis", 
+                                 "te_mar" = "T. maritinum",
+                                 "pa_ther" = "P. theridion",
+                                 "fl_psy" = "F. psychrophilum",
+                                 "sch" = "Ca. S. salmonis",
+                                 "te_bry" = "T. bryosalmonae",
+                                 "pa_kab" = "P. kabatai",
+                                 "c_b_cys" = "Ca. B. cysticola",
+                                 "pa_min" = "P. minibicornis",
+                                 "arena2" = "SPAV-2",
+                                 "fa_mar" = "F. margolisi",
+                                 "my_arc" = "M. arcticus",
+                                 "ven" = "VENV",
+                                 "ic_hof" = "I. hoferi",
+                                 "lo_sal" = "L. salmonae",
+                                 "rlo" = "RLO",
+                                 "sp_des" = "S. destruens",
+                                 "ku_thy" = "K. thyrsites",
+                                 "prv" = "PRV",
+                                 "pspv" = "PSPV",
+                                 "ce_sha" = "C. shasta",
+                                 "pa_pse" = "P. pseudobranchicola",
+                                 "de_sal" = "D. salmonis")
+dim(inf_agt_resid_data_gl)
 
 # Create objects for analysis
 agents <- unique(inf_agt_resid_data_gl$agent)
@@ -55,17 +72,44 @@ years <- unique(inf_agt_resid_data_gl$Year)
 
 # Plot total detections of each agent by year - note variable prevalence across agents and years
 samplesperagent.sw<-inf_agt_resid_data_gl %>% 
-  group_by(agent, Year) %>%
-  summarise(N. = sum(N.))
+  group_by(agent, Year, N.) %>%
+  summarise(N = sum(N))
+
+#plot
 jpeg(filename='figs/Fig_Total agent detections by year.jpg', 
      width=480, height=500, quality=75)
 ggplot(data=samplesperagent.sw, aes(x=reorder(agent, N.), y=N., fill=factor(Year)))+
   geom_bar(stat="identity")+
+  labs(fill="Sampling year") +
   coord_flip()+
-  xlab("Stock")+
-  ylab("sample totals")
+  xlab("Infectious agents")+
+  ylab("Positive detections")+
+  scale_x_discrete(labels=c("ic_mul" = expression(italic("I. multifiliis")), 
+                            "te_mar" = expression(italic("T. maritinum")),
+                            "pa_ther" = expression(italic("P. theridion")),
+                            "fl_psy" = expression(italic("F. psychrophilum")),
+                            "sch" = expression(italic("Ca. S. salmonis")),
+                            "te_bry" = expression(italic("T. bryosalmonae")),
+                            "pa_kab" = expression(italic("P. kabatai")),
+                            "c_b_cys" = expression(italic("Ca. B. cysticola")),
+                            "pa_min" = expression(italic("P. minibicornis")),
+                            "arena2" = "SPAV-2",
+                            "fa_mar" = expression(italic("F. margolisi")),
+                            "my_arc" = expression(italic("M. arcticus")),
+                            "ven" = "VENV",
+                            "ic_hof" = expression(italic("I. hoferi")),
+                            "lo_sal" = expression(italic("L. salmonae")),
+                            "rlo" = "RLO",
+                            "sp_des" = expression(italic("S. destruens")),
+                            "ku_thy" = expression(italic("K. thyrsites")),
+                            "prv" = "PRV",
+                            "pspv" = "PSPV",
+                            "ce_sha" = expression(italic("C. shasta")),
+                            "pa_pse" = expression(italic("P. pseudobranchicola")),
+                            "de_sal" = expression(italic("D. salmonis"))))
 dev.off()
 
+11+21+2+15+22+122
 # Plot raw data by: 
 ## Prevalence
 jpeg(filename='figs/Fig_Raw data by year_prev.jpg', 

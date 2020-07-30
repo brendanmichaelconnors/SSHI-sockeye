@@ -81,6 +81,7 @@ names(sst) <- c("Year", "Stock_Analysis", "sst_anom")
 
 # Create "agent" object
 agents <- unique(inf_agt_resid_data_gl$agent)
+years <- unique(inf_agt_resid_data_gl$brood_year)
 
 #Bring in truncated resdiduals
 trnc_resid<-read.csv("data/survival_indices_truncated.csv", head=TRUE)
@@ -90,7 +91,45 @@ names(trnc_resid) <- c("orderID", "Stock_Analysis", "brood_year", "metric", "res
 ##create object with just SRR_resid metric to align with infection data
 trnc_resid_srr <- trnc_resid[trnc_resid$metric=="SR_resid",]
 
+# Plot sampled fish per stock by year
+samplesperstock.sw<-sw.data %>% 
+  group_by(Stock, Year) %>%
+  count(Year)
 
+jpeg(filename='figs/Fig_Total fish sampled by stock per year_SW.jpg', 
+     width=480, height=800, quality=75)
+ggplot(data=samplesperstock.sw, aes(x=reorder(Stock, n), y=n, fill=factor(Year)))+
+  geom_bar(stat="identity") +
+  labs(fill="Sampling year") +
+  coord_flip()+
+  xlab("Stock")+
+  ylab("Total fish sampled")
+dev.off()
+
+jpeg(filename='figs/Fig_Total fish sampled by stock per year_SW_yearY.jpg', 
+     width=800, height=500, quality=75)
+ggplot(data=samplesperstock.sw, aes(x=factor(Year), y=n, fill=Stock))+
+  geom_bar(stat="identity") +
+  labs(fill="Stock") +
+  coord_flip()+
+  xlab("Year")+
+  ylab("Total fish sampled")
+dev.off()
+
+## Freshwater totals by stock and year
+samplesperstock.fw<-fw.data %>% 
+  group_by(Stock, Year) %>%
+  count(Year)
+
+jpeg(filename='figs/Fig_Total fish sampled by stock per year_FW_yearY.jpg', 
+     width=800, height=500, quality=75)
+ggplot(data=samplesperstock.fw, aes(x=factor(Year), y=n, fill=Stock))+
+  geom_bar(stat="identity") +
+  labs(fill="Stock") +
+  coord_flip()+
+  xlab("Year")+
+  ylab("Total fish sampled")
+dev.off()
 
 # Investigate variability of agents by Latitude
 #CODE IN PROCESS#
@@ -146,14 +185,19 @@ all.ic_mul.fw$brood_year <- all.ic_mul.fw$Year-2
 ic_mul.resid.fw <- merge(trnc_resid_srr, all.ic_mul.fw, by = c("brood_year", "Year"))
 
 jpeg(filename='figs/Fig_ic_mul FW prev corr w SR resid.jpg', 
-     width=480, height=600, quality=75)
+     width=480, height=500, quality=75)
 ggplot(ic_mul.resid.fw, aes(prev, resid_value, color=Stock_Analysis)) +
   geom_point(aes(color=Stock_Analysis)) +
   geom_smooth(aes(prev, resid_value), method = "lm", se=F, size=.2) +
-  labs(y = "SR residuals",x = "FW Prevalence by Year (ic_mul)")
+  labs(y = "Stock-recruitment residuals",x = "Freshwater prevalence per year", 
+       title=expression(paste(italic("I. multifiliis"))), color="Stock")
 dev.off()
 
-
+# Stats for ic_mul
+mod_ic_mul_fw <- lmer(resid_value ~ prev + (1 | Stock_Analysis), ic_mul.resid.fw)
+summary(mod_ic_mul_fw)
+mod_ic_mul_fw_null <- lmer(resid_value ~ (1 | Stock_Analysis), ic_mul.resid.fw)
+summary(mod_ic_mul_fw_null)
 
 ## te_mar
 all.te_mar.sw =
