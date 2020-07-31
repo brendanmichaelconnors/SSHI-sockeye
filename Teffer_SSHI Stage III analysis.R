@@ -194,10 +194,11 @@ ggplot(ic_mul.resid.fw, aes(prev, resid_value, color=Stock_Analysis)) +
 dev.off()
 
 # Stats for ic_mul
-mod_ic_mul_fw <- lmer(resid_value ~ prev + (1 | Stock_Analysis), ic_mul.resid.fw)
+mod_ic_mul_fw <- lmer(resid_value ~ prev + (1 | Stock_Analysis), ic_mul.resid.fw, REML=F)
 summary(mod_ic_mul_fw)
-mod_ic_mul_fw_null <- lmer(resid_value ~ (1 | Stock_Analysis), ic_mul.resid.fw)
+mod_ic_mul_fw_null <- lmer(resid_value ~ (1 | Stock_Analysis), ic_mul.resid.fw, REML=F)
 summary(mod_ic_mul_fw_null)
+anova(mod_ic_mul_fw, mod_ic_mul_fw_null)
 
 ## te_mar
 all.te_mar.sw =
@@ -226,10 +227,22 @@ ggplot(sw.data,aes(Latitude, log10(te_mar), shape=Zone, color=factor(Year))) +
 
 ggplot(sw.data, aes(Latitude, log10(te_mar))) +
   geom_point() 
+
+# stats te_mar
+names(sw.data)
+te_mar.data <- na.omit(sw.data[,c(5,22,79)])
+te_mar.data$log.te_mar<- log10(te_mar.data$te_mar)
+te_mar.data$log.te_mar[te_mar.data$log.te_mar == "-Inf"] <- 0
+
+mod.te_mar.lat <- lmer(log.te_mar ~ Latitude + (1 | Year), te_mar.data, REML=F)
+summary(mod.te_mar.lat)
+mod.te_mar.lat.null <- lmer(log.te_mar ~ (1 | Year), te_mar.data, REML=F)
+summary(mod.te_mar.lat.null)
+anova(mod.te_mar.lat, mod.te_mar.lat.null)
+
 #See maps in GitHub - te_mar detections centeres in northern SOG, DI, JS
 #Possible migration conditions, density (transmission), or exposure to farmed salmon (if te_mar an issue)
 #generally low prevalence agent
-
 
 ##pa_ther
 sw.data.year.st <-sw.data %>% group_by(Year, Stock_Analysis) #create object to be summarized by year
@@ -270,9 +283,35 @@ ggplot(pa_ther.sst,aes(sst_anom, prev, color=factor(brood_year))) +
   geom_point() 
 
 jpeg(filename='figs/Fig_pa_ther prev corr w SST by stock.jpg', 
-     width=480, height=600, quality=75)
-ggplot(pa_ther.sst,aes(sst_anom, prev, color=Stock_Analysis)) +
-  geom_point() +
-  geom_smooth(aes(sst_anom, prev), method = "lm", se=F, size=.2) 
+     width=300, height=300, quality=75)
+ggplot(pa_ther.sst,aes(sst_anom, prev)) +
+  geom_point(aes(color=Stock_Analysis)) +
+  geom_smooth(data=pa_ther.sst, aes(sst_anom, prev, color="black"), method = "loess", se=F, size=.2, span=.75) 
 dev.off()
+
+# te_mar
+sw.data.year.st <-sw.data %>% group_by(Year, Stock_Analysis) #create object to be summarized by year
+
+all.te_mar.sw =
+  data.frame(
+    sw.data.year.st %>% 
+      summarise(
+        mean(Latitude[Latitude!=0], na.rm=TRUE),
+        min(Latitude[Latitude!=0], na.rm=TRUE),
+        max(Latitude[Latitude!=0], na.rm=TRUE),
+        length(which(te_mar!="NA")), #samples
+        length(which(te_mar>0)), #positive detections
+        length(which(te_mar>0))/length(which(!is.na(te_mar))),  #calculates prevalence
+        mean(te_mar[te_mar!=0], na.rm=TRUE),
+        (length(which(te_mar>0)) / length(which(!is.na(te_mar)))) * mean(te_mar[te_mar!=0], na.rm=TRUE)
+      )
+  )
+names(all.te_mar.sw) <- c("Year", "Stock_Analysis", "Latitude", "minLat", "maxLat", "N", "N+", "prev", "mean_load", "prevload") #rename columns
+all.te_mar.sw$brood_year<-all.te_mar.sw$Year-2
+te_mar.sst <- merge(all.te_mar.sw, sst, by = c("Stock_Analysis", "Year"))
+
+ggplot(te_mar.sst,aes(sst_anom, prev, color=factor(brood_year))) +
+  geom_point() 
+
+## Size, length and infection
 
