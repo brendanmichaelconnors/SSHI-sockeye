@@ -53,6 +53,7 @@ head(summary_table)
 
 
 ## Calculate average SST anomaly within area where stock spends first few months of marine life 
+library(plyr)
 sst_yr_1_stock_anomalies <- sst.averager(summary_table, sst.anom, distance = 400)
 colnames(sst_yr_1_stock_anomalies) <- c("Year","sst_raw","sst_anomaly","Stock.ID")
 
