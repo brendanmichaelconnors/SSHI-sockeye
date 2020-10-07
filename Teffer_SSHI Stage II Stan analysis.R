@@ -109,7 +109,7 @@ ggplot(data=samplesperagent.sw, aes(x=reorder(agent, N.), y=N., fill=factor(Year
                             "de_sal" = expression(italic("D. salmonis"))))
 dev.off()
 
-11+21+2+15+22+122
+
 # Plot raw data by: 
 ## Prevalence
 jpeg(filename='figs/Fig_Raw data by year_prev.jpg', 
@@ -1128,9 +1128,9 @@ stk.spec.slope.load <- matrix(NA,
                               dimnames = list(para_name2,c("2.5","25","50","75","97.5","agent")))
 
 for(i in agents){
-  model<-get(paste("mod",i, sep="."))
+  model<-get(paste("mod.load",i, sep="."))
   temp2 <- data.frame(model)
-  temp3 <- temp2[,grepl("prev",names(temp2))] #include only columns with "prev" in name
+  temp3 <- temp2[,grepl("load",names(temp2))] #include only columns with "load" in name
   temp4 <- temp3[,-grep("igma",colnames(temp3))] #remove columns with "igma" in name
   temp5 <- temp4[2001:4000,] #remove warm up iterations
   temp6 <- data.frame(temp5[,1] + temp5[,2:19]) #add the stock-specific draws to global column
@@ -1199,3 +1199,123 @@ ggplot(stk.spec.te_mar.load) +
   coord_flip()
 dev.off()
 
+
+
+###################################################################
+## FOR ART:
+
+# PREVALENCE
+## Create a matrix and loop
+stk.spec.slope.art <- matrix(NA,
+                         nrow = 19,
+                         ncol = 7,
+                         dimnames = list(para_name2,c("5","25","40","60","75","90","agent")))
+
+for(i in agents){
+  model<-get(paste("mod",i, sep="."))
+  temp2 <- data.frame(model)
+  temp3 <- temp2[,grepl("prev",names(temp2))] #include only columns with "prev" in name
+  temp4 <- temp3[,-grep("igma",colnames(temp3))] #remove columns with "igma" in name
+  temp5 <- temp4[2001:4000,] #remove warm up iterations
+  temp6 <- data.frame(temp5[,1] + temp5[,2:19]) #add the stock-specific draws to global column
+  temp7 <- cbind(temp5[,1],temp6) #bind with global column
+  para_name2 <- colnames(temp5) #create an object with column names
+  colnames(temp7) <- colnames(temp5) #assign names to columns
+  nam <- paste("stk.spec.slope.art", i, sep = ".")
+  temp8 <- as.matrix(apply(temp7, 2, quantile, probs = c(0.05,0.25,0.40,0.60,0.75,0.90)))
+  temp9 <- t(temp8)
+  temp10<- as.matrix(cbind(temp9, paste(i)))
+  colnames(temp10) <- c("5","25","40","60","75","90","agent") #assign names to columns
+  as.matrix(assign(nam, stk.spec.slope.art[i] <- temp10))
+}
+
+#### Rbind all posteriors and save as .csv file
+stk.spec.slope.art.all <- rbind(stk.spec.slope.art.arena2,
+                            stk.spec.slope.art.c_b_cys,
+                            stk.spec.slope.art.ce_sha,
+                            stk.spec.slope.art.de_sal,
+                            stk.spec.slope.art.fa_mar,
+                            stk.spec.slope.art.fl_psy,
+                            stk.spec.slope.art.ic_hof,
+                            stk.spec.slope.art.ic_mul,
+                            stk.spec.slope.art.ku_thy,
+                            stk.spec.slope.art.lo_sal,
+                            stk.spec.slope.art.my_arc,
+                            stk.spec.slope.art.pa_kab,
+                            stk.spec.slope.art.pa_min,
+                            stk.spec.slope.art.pa_pse,
+                            stk.spec.slope.art.pa_ther,
+                            stk.spec.slope.art.prv,
+                            stk.spec.slope.art.pspv,
+                            stk.spec.slope.art.rlo,
+                            stk.spec.slope.art.sch,
+                            stk.spec.slope.art.sp_des,
+                            stk.spec.slope.art.te_bry,
+                            stk.spec.slope.art.te_mar,
+                            stk.spec.slope.art.ven)
+write.csv(stk.spec.slope.art.all, file="data/Stock specific slopes_prev_FOR ART.csv")
+
+##### READ IN DATA FROM FILE
+stspslp.art <- read.csv("data/Stock specific slopes_prev_FOR ART.csv")
+stspslp.art$stock <- substr(stspslp.art$X, 18, 28)
+stspslp.art$stock <- substr(stspslp.art$stock, 1, nchar(stspslp.art$stock)-1)
+stspslp.art$stock <- sub("^$", "Global", stspslp.art$stock)
+write.csv(stspslp.art, file="data/Stock specific slopes_prev_FOR ART.csv")
+
+# LOAD
+## Create a matrix and loop
+stk.spec.slope.load.art <- matrix(NA,
+                             nrow = 19,
+                             ncol = 7,
+                             dimnames = list(para_name2,c("5","25","40","60","75","90","agent")))
+
+for(i in agents){
+  model<-get(paste("mod.load",i, sep="."))
+  temp2 <- data.frame(model)
+  temp3 <- temp2[,grepl("load",names(temp2))] #include only columns with "prev" in name
+  temp4 <- temp3[,-grep("igma",colnames(temp3))] #remove columns with "igma" in name
+  temp5 <- temp4[2001:4000,] #remove warm up iterations
+  temp6 <- data.frame(temp5[,1] + temp5[,2:19]) #add the stock-specific draws to global column
+  temp7 <- cbind(temp5[,1],temp6) #bind with global column
+  para_name2 <- colnames(temp5) #create an object with column names
+  colnames(temp7) <- colnames(temp5) #assign names to columns
+  nam <- paste("stk.spec.slope.load.art", i, sep = ".")
+  temp8 <- as.matrix(apply(temp7, 2, quantile, probs = c(0.05,0.25,0.40,0.60,0.75,0.90)))
+  temp9 <- t(temp8)
+  temp10<- as.matrix(cbind(temp9, paste(i)))
+  colnames(temp10) <- c("5","25","40","60","75","90","agent") #assign names to columns
+  as.matrix(assign(nam, stk.spec.slope.load.art[i] <- temp10))
+}
+
+#### Rbind all posteriors and save as .csv file
+stk.spec.slope.load.art.all <- rbind(stk.spec.slope.load.art.arena2,
+                                stk.spec.slope.load.art.c_b_cys,
+                                stk.spec.slope.load.art.ce_sha,
+                                stk.spec.slope.load.art.de_sal,
+                                stk.spec.slope.load.art.fa_mar,
+                                stk.spec.slope.load.art.fl_psy,
+                                stk.spec.slope.load.art.ic_hof,
+                                stk.spec.slope.load.art.ic_mul,
+                                stk.spec.slope.load.art.ku_thy,
+                                stk.spec.slope.load.art.lo_sal,
+                                stk.spec.slope.load.art.my_arc,
+                                stk.spec.slope.load.art.pa_kab,
+                                stk.spec.slope.load.art.pa_min,
+                                stk.spec.slope.load.art.pa_pse,
+                                stk.spec.slope.load.art.pa_ther,
+                                stk.spec.slope.load.art.prv,
+                                stk.spec.slope.load.art.pspv,
+                                stk.spec.slope.load.art.rlo,
+                                stk.spec.slope.load.art.sch,
+                                stk.spec.slope.load.art.sp_des,
+                                stk.spec.slope.load.art.te_bry,
+                                stk.spec.slope.load.art.te_mar,
+                                stk.spec.slope.load.art.ven)
+write.csv(stk.spec.slope.load.art.all, file="data/Stock specific slopes_load_FOR ART.csv")
+
+##### READ IN DATA FROM FILE
+stspslp.load.art <- read.csv("data/Stock specific slopes_load_FOR ART.csv")
+stspslp.load.art$stock <- substr(stspslp.load.art$X, 18, 28)
+stspslp.load.art$stock <- substr(stspslp.load.art$stock, 1, nchar(stspslp.load.art$stock)-1)
+stspslp.load.art$stock <- sub("^$", "Global", stspslp.load.art$stock)
+write.csv(stspslp.load.art, file="data/Stock specific slopes_load_FOR ART.csv")

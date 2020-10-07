@@ -76,7 +76,13 @@ levels(fw.major$Stock_Analysis)[levels(fw.major$Stock_Analysis)=="Early Stuart"]
 levels(fw.major$Stock_Analysis)[levels(fw.major$Stock_Analysis)=="Late Shuswap"] <- "L.Shuswap"
 levels(fw.major$Stock_Analysis)[levels(fw.major$Stock_Analysis)=="Late Stuart"] <- "L.Stuart"
 levels(fw.major$Stock_Analysis)[levels(fw.major$Stock_Analysis)=="Harrison-Widgeon"] <- "Harrison"
-fw.data <- fw.major #rename
+
+# Clean FW data
+fw3<-droplevels(fw.major[-which(fw.major$Stock_Analysis=="VI") ,]) #remove VI 
+dim(fw3)
+fw4<-droplevels(fw3[-which(fw3$Stock_Analysis=="Central Coast") ,]) #remove CC
+dim(fw4)
+fw.data <- fw4 #rename
 
 #### Brood table data
 #Run code from sst_anomalies.R and exploratory_stage_1_analysis.Rmd for sst and brood table data 
@@ -135,18 +141,39 @@ dev.off()
 
 ## Freshwater totals by stock and year
 samplesperstock.fw<-fw.data %>% 
-  group_by(Stock, Year) %>%
+  group_by(Stock_Analysis, Year) %>%
   count(Year)
 
 jpeg(filename='figs/Fig_Total fish sampled by stock per year_FW_yearY.jpg', 
      width=800, height=500, quality=75)
-ggplot(data=samplesperstock.fw, aes(x=factor(Year), y=n, fill=Stock))+
+ggplot(data=samplesperstock.fw, aes(x=factor(Year), y=n, fill=Stock_Analysis))+
   geom_bar(stat="identity") +
   labs(fill="Stock") +
   coord_flip()+
   xlab("Year")+
   ylab("Total fish sampled")
 dev.off()
+
+
+## Freshwater totals by stock
+samplesperstock.fw.st<-fw.data %>% 
+  group_by(Stock_Analysis) %>%
+  count(Stock_Analysis)
+# Stocks sampled in FW
+jpeg(filename='figs/Fig_Total fish sampled by Stock_Analysis_FW.jpg', 
+     width=800, height=500, quality=75)
+ggplot(data=samplesperstock.fw.st, aes(x=reorder(Stock_Analysis, n), y=n))+
+  geom_bar(stat="identity") +
+  coord_flip() +
+  xlab("Stock") +
+  ylab("Total fish sampled")
+dev.off()
+
+ggplot(data=fw.data, aes(x=Stock_Analysis, y=Year))+
+  geom_point(stat="identity") +
+  coord_flip() +
+  xlab("Stock") +
+  ylab("FW Longitude")
 
 # Investigate variability of agents by Latitude
 #CODE IN PROCESS#
@@ -184,7 +211,7 @@ ggplot(sw.data,aes(Latitude, log10(ic_mul), shape=Zone, color=factor(Year))) +
 
 
 ## ic_mul FW influence
-fw.data.year <-fw.data %>% group_by(Year) #create object to be summarized by year
+fw.data.year <-fw.data %>% group_by(Year, Stock_Analysis) #create object to be summarized by year
 
 all.ic_mul.fw =
   data.frame(
@@ -197,9 +224,9 @@ all.ic_mul.fw =
         (length(which(ic_mul>0)) / length(which(!is.na(ic_mul)))) * mean(ic_mul[ic_mul!=0], na.rm=TRUE)
       )
   )
-names(all.ic_mul.fw) <- c("Year", "N", "N+", "prev", "mean_load", "prevload") #rename columns
+names(all.ic_mul.fw) <- c("Year","Stock_Analysis","N","N+","prev","mean_load","prevload") #rename columns
 all.ic_mul.fw$brood_year <- all.ic_mul.fw$Year-2
-ic_mul.resid.fw <- merge(trnc_resid_srr, all.ic_mul.fw, by = c("brood_year", "Year"))
+ic_mul.resid.fw <- merge(trnc_resid_srr, all.ic_mul.fw, by = c("brood_year", "Stock_Analysis"))
 
 jpeg(filename='figs/Fig_ic_mul FW prev corr w SR resid.jpg', 
      width=480, height=500, quality=75)
@@ -211,11 +238,154 @@ ggplot(ic_mul.resid.fw, aes(prev, resid_value, color=Stock_Analysis)) +
 dev.off()
 
 # Stats for ic_mul
-mod_ic_mul_fw <- lmer(resid_value ~ prev + (1 | Stock_Analysis), ic_mul.resid.fw, REML=F)
-summary(mod_ic_mul_fw)
-mod_ic_mul_fw_null <- lmer(resid_value ~ (1 | Stock_Analysis), ic_mul.resid.fw, REML=F)
-summary(mod_ic_mul_fw_null)
-anova(mod_ic_mul_fw, mod_ic_mul_fw_null)
+## STAN model for ic_mul FW
+# PREVALENCE
+fw.ic_mul.FW <- stan_lmer(resid_value ~ 0 + prev + (prev|Stock_Analysis) +(1|brood_year), 
+          data = ic_mul.resid.fw,
+          adapt_delta=0.95,
+          REML = F)
+summary(fw.ic_mul.FW)
+
+ind_coef.mean <- summary(fw.ic_mul.FW, 
+        pars = c("prev"),
+        probs = c(0.025,0.25,0.5,0.75, 0.975),
+        digits = 2)
+fw.mod.post.ic_mul.mean <- as.matrix(ind_coef.mean[1, c(4:8)])
+fw.mod.post.ic_mul.mean <- data.frame(t(fw.mod.post.ic_mul.mean))
+
+ind_coef <- summary(fw.ic_mul.FW, 
+        regex_pars = c("b\\[\\prev Stock_Analysis\\:"),
+        probs = c(0.025,0.25,0.5,0.75, 0.975),
+        digits = 2)
+fw.mod.post.ic_mul <- data.frame(ind_coef[c(1:15),c(4:8)])
+fw.ic_mul.slp <- rbind(fw.mod.post.ic_mul.mean, fw.mod.post.ic_mul)
+fw.ic_mul.slp <- rownames_to_column(fw.ic_mul.slp)
+ggplot(fw.ic_mul.slp) +
+  geom_hline(yintercept = 0, linetype = "dashed", col="blue")+
+  geom_linerange(aes(x = reorder(rowname, -X50.), ymax = X75., ymin = X25.), size=1.5, col="black") +
+  geom_linerange(aes(x = rowname, ymax = X97.5., ymin = X2.5.), col="black") +
+  geom_point(aes(x = rowname, y = X50.), size = 3) +
+  #ylim(-0.8,0.8)+
+  coord_flip()
+
+temp2 <- data.frame(fw.ic_mul.FW)
+temp3 <- temp2[,grepl("prev",names(temp2))] #include only columns with "prev" in name
+temp4 <- temp3[,-grep("igma",colnames(temp3))] #remove columns with "igma" in name
+temp5 <- temp4[2001:4000,] #remove warm up iterations
+temp6 <- data.frame(temp5[,1] + temp5[,2:16]) #add the stock-specific draws to global column
+temp7 <- cbind(temp5[,1],temp6) #bind with global column
+para_name2 <- colnames(temp5) #create an object with column names
+colnames(temp7) <- colnames(temp5) #assign names to columns
+temp8 <- as.matrix(apply(temp7, 2, quantile, probs = c(0.025,0.25,0.50,0.75,0.975)))
+temp9 <- t(temp8)
+temp10<- as.matrix(temp9)
+colnames(temp10) <- c("2.5","25","50","75","97.5") #assign names to columns
+write.csv(temp10, file="data/Stock specific slopes_prev ic_mul_FW_by stock prev.csv")
+stspslp.ic_mulfw <- read.csv("data/Stock specific slopes_prev ic_mul_FW_by stock prev.csv")
+stspslp.ic_mulfw$stock <- substr(stspslp.ic_mulfw$X, 23, 33)
+stspslp.ic_mulfw$stock <- substr(stspslp.ic_mulfw$stock, 1, nchar(stspslp.ic_mulfw$stock)-1)
+stspslp.ic_mulfw$stock <- sub("^$", "Global", stspslp.ic_mulfw$stock)
+colnames(stspslp.ic_mulfw) <- c("X","X2.5","X25","X50","X75","X97.5","stock")
+
+## Plot
+jpeg(filename='figs/Fig_SSHI ONNE_stock sp slope_ic_mul_FW.jpg', 
+     width=480, height=500, quality=75)
+ggplot(stspslp.ic_mulfw) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_linerange(aes(x = reorder(stock, -X50), ymax = X75, ymin = X25), size=1.5, col="gray") +
+  geom_linerange(aes(x = stock, ymax = X97.5, ymin = X2.5), col="gray") +
+  geom_linerange(data=stspslp.ic_mulfw[stspslp.ic_mulfw$stock=="Global",], 
+                 aes(x = stock, ymax = X75, ymin = X25), size=2, col="black") +
+  geom_linerange(data=stspslp.ic_mulfw[stspslp.ic_mulfw$stock=="Global",], 
+                 aes(x = stock, ymax = X2.5, ymin = X97.5), col="black") +
+  geom_point(aes(x = stock, y = X50), size = 2) +
+  geom_point(data=stspslp.ic_mulfw[stspslp.ic_mulfw$stock=="Global",], aes(x = stock, y = X50), size = 3) +
+  labs(x="Stock", y="Effect size") +
+  coord_flip()
+dev.off()
+
+# Proportion <0
+model<-as.matrix(fw.ic_mul.FW)
+model2<-model[2001:4000,]
+param.prop0.ic_mul.fw <- (colSums(model2 < 0))/2000 #proportion <0
+minfw <- colSums(model2 > 0) #total above zero
+
+
+# INTENSITY - will not run without divergent transitions
+fw.ic_mul.FW.load <- stan_lmer(resid_value ~ 0 + mean_load + (mean_load|Stock_Analysis) +(1|brood_year), 
+                          data = ic_mul.resid.fw,
+                          adapt_delta=0.99,
+                          REML = F)
+summary(fw.ic_mul.FW.load)
+
+ind_coef.mean.load <- summary(fw.ic_mul.FW.load, 
+                         pars = c("mean_load"),
+                         probs = c(0.025,0.25,0.5,0.75, 0.975),
+                         digits = 2)
+fw.mod.post.ic_mul.mean.load <- as.matrix(ind_coef.mean.load[1, c(4:8)])
+fw.mod.post.ic_mul.mean.load <- data.frame(t(fw.mod.post.ic_mul.mean.load))
+
+ind_coef <- summary(fw.ic_mul.FW.load, 
+                    regex_pars = c("b\\[\\mean_load Stock_Analysis\\:"),
+                    probs = c(0.025,0.25,0.5,0.75, 0.975),
+                    digits = 2)
+fw.mod.post.ic_mul.load <- data.frame(ind_coef[c(1:18),c(4:8)])
+fw.ic_mul.slp.load <- rbind(fw.mod.post.ic_mul.mean, fw.mod.post.ic_mul)
+fw.ic_mul.slp.load <- rownames_to_column(fw.ic_mul.slp.load)
+ggplot(fw.ic_mul.slp.load) +
+  geom_hline(yintercept = 0, linetype = "dashed", col="blue")+
+  geom_linerange(aes(x = reorder(rowname, -X50.), ymax = X75., ymin = X25.), size=1.5, col="black") +
+  geom_linerange(aes(x = rowname, ymax = X97.5., ymin = X2.5.), col="black") +
+  geom_point(aes(x = rowname, y = X50.), size = 3) +
+  #ylim(-0.8,0.8)+
+  coord_flip()
+
+temp2 <- data.frame(fw.ic_mul.FW.load)
+temp3 <- temp2[,grepl("mean_load",names(temp2))] #include only columns with "mean_load" in name
+temp4 <- temp3[,-grep("igma",colnames(temp3))] #remove columns with "igma" in name
+temp5 <- temp4[2001:4000,] #remove warm up iterations
+temp6 <- data.frame(temp5[,1] + temp5[,2:19]) #add the stock-specific draws to global column
+temp7 <- cbind(temp5[,1],temp6) #bind with global column
+para_name2 <- colnames(temp5) #create an object with column names
+colnames(temp7) <- colnames(temp5) #assign names to columns
+temp8 <- as.matrix(apply(temp7, 2, quantile, probs = c(0.025,0.25,0.50,0.75,0.975)))
+temp9 <- t(temp8)
+temp10<- as.matrix(temp9)
+colnames(temp10) <- c("2.5","25","50","75","97.5") #assign names to columns
+write.csv(temp10, file="data/Stock specific slopes_load ic_mul_FW.csv")
+stspslp.ic_mulfw.load <- read.csv("data/Stock specific slopes_load ic_mul_FW.csv")
+stspslp.ic_mulfw.load$stock <- substr(stspslp.ic_mulfw.load$X, 28, 38)
+stspslp.ic_mulfw.load$stock <- substr(stspslp.ic_mulfw.load$stock, 1, nchar(stspslp.ic_mulfw.load$stock)-1)
+stspslp.ic_mulfw.load$stock <- sub("^$", "Global", stspslp.ic_mulfw.load$stock)
+colnames(stspslp.ic_mulfw.load) <- c("X","X2.5","X25","X50","X75","X97.5","stock")
+
+## Plot
+jpeg(filename='figs/Fig_SSHI ONNE_stock sp slope_ic_mul_FW_LOAD.jpg', 
+     width=480, height=500, quality=75)
+ggplot(stspslp.ic_mulfw.load) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_linerange(aes(x = reorder(stock, -X50), ymax = X75, ymin = X25), size=1.5, col="gray") +
+  geom_linerange(aes(x = stock, ymax = X97.5, ymin = X2.5), col="gray") +
+  geom_linerange(data=stspslp.ic_mulfw.load[stspslp.ic_mulfw.load$stock=="Global",], 
+                 aes(x = stock, ymax = X75, ymin = X25), size=2, col="black") +
+  geom_linerange(data=stspslp.ic_mulfw.load[stspslp.ic_mulfw.load$stock=="Global",], 
+                 aes(x = stock, ymax = X2.5, ymin = X97.5), col="black") +
+  geom_point(aes(x = stock, y = X50), size = 2) +
+  geom_point(data=stspslp.ic_mulfw.load[stspslp.ic_mulfw.load$stock=="Global",], aes(x = stock, y = X50), size = 3) +
+  labs(x="Stock", y="Effect size") +
+  coord_flip()
+dev.off()
+
+# Proportion <0
+model<-as.matrix(fw.ic_mul.FW.load)
+model2<-model[2001:4000,]
+param.prop0.ic_mul.fw <- (colSums(model2 < 0))/2000 #proportion <0
+minfw <- colSums(model2 > 0) #total above zero
+
+
+
+
+
 
 ## te_mar
 all.te_mar.sw =
@@ -288,6 +458,9 @@ pa_ther.sst <- merge(all.pa_ther.sw, early.sst, by = c("Stock_Analysis", "brood_
 ggplot(all.pa_ther.sw,aes(prev, Latitude, color=factor(brood_year))) +
   geom_point() +
   geom_linerange(aes(ymin = minLat, ymax = maxLat))
+ggplot(all.pa_ther.sw,aes(Latitude, prev)) +
+  geom_point() +
+  geom_smooth(aes(Latitude, prev), method = "loess", se=F, size=.2) 
 ggplot(sw.data,aes(Latitude, log10(pa_ther), color=factor(Year))) +
   geom_point() +
   geom_smooth(aes(Latitude, log10(pa_ther)), method = "lm", se=F, size=.2) 
@@ -314,6 +487,17 @@ ggplot(pa_ther.sst) +
   labs(x="SST anomaly", y="Prevalence", title=expression(italic("P. theridion")), color="Sampling year")
 dev.off()
 
+pa_ther.mod.sst.load <- lmer(log10(mean_load) ~ sst_anom + sst_anom|Year, data = pa_ther.sst, REML=T)
+summary(pa_ther.mod.sst.load)
+pa_ther.mod.sst <- lmer(prev ~ sst_anom + sst_anom|Year, data = pa_ther.sst, REML=F)
+summary(pa_ther.mod.sst)
+
+library(mgcv)
+install.packages(tidymv)
+gam.pa_ther.sst <- gam(prev ~ sst_anom, data = pa_ther.sst)
+summary(gam.pa_ther.sst)
+plot_smooths(gam.pa_ther.sst)
+  
 
 ## te_mar
 sw.data.year.st <-sw.data %>% group_by(Year, Stock_Analysis) #create object to be summarized by year
@@ -462,3 +646,76 @@ ggplot(ic_mul.sst.global) +
   labs(x="SST anomaly", y="Log mean load", title=expression(italic("Ichthyophthirius multifiliis")), color="Sampling year")
 dev.off()
 
+
+### Examining loads relative to distance to farms and Fraser River mouth
+ONNE_with_dists <- readRDS("~/Documents.nosync/DFO PDF/Data/SSHI-sockeye/ONNE_with_dists.rds")
+names(ONNE_with_dists)
+
+### te_mar
+ggplot(ONNE_with_dists)+
+  geom_point(aes(nearest_AC_sway, log10(te_mar)))+
+  geom_smooth(data=ONNE_with_dists, aes(nearest_AC_sway, log10(te_mar)), method="lm")
+ggplot(ONNE_with_dists)+
+  geom_point(aes(fm_dist, log10(te_mar)))+
+  geom_smooth(data=ONNE_with_dists, aes(fm_dist, log10(te_mar)), method="lm")
+
+
+### pa_ther
+ggplot(ONNE_with_dists)+
+  geom_point(aes(nearest_AC_sway, log10(pa_ther)))+
+  geom_smooth(data=ONNE_with_dists, aes(nearest_AC_sway, log10(pa_ther)), method="lm")
+ggplot(ONNE_with_dists)+
+  geom_point(aes(fm_dist, log10(pa_ther)))+
+  geom_smooth(data=ONNE_with_dists, aes(fm_dist, log10(pa_ther)), method="lm")
+
+### ic_mul
+ggplot(ONNE_with_dists)+
+  geom_point(aes(nearest_AC_sway, log10(ic_mul)))+
+  geom_smooth(data=ONNE_with_dists, aes(nearest_AC_sway, log10(ic_mul)), method="lm")
+ggplot(ONNE_with_dists)+
+  geom_point(aes(fm_dist, log10(ic_mul)))+
+  geom_smooth(data=ONNE_with_dists, aes(fm_dist, log10(ic_mul)), method="lm")
+
+
+##Define breaks
+ONNE_with_dists$te_mar.ct <- as.numeric(ifelse(ONNE_with_dists$te_mar > 0, 1, 0))
+ONNE_with_dists$brks <- as.numeric(cut_number(ONNE_with_dists$fm_dist,30))
+ONNE_with_dists <- data.frame(ONNE_with_dists)
+ONNE_with_dists.brks <-ONNE_with_dists %>% group_by(brks, te_mar.ct) #create object to be summarized by brks
+
+ggplot(data=ONNE_with_dists) +
+  geom_bar(aes(x=brks), col="black", position=position_stack()) +
+  geom_bar(stat="identity", aes(x=brks, y=te_mar.ct, fill=factor(Year)), col="black", position=position_stack()) 
+
+te_mar.dist1 <- aggregate(ONNE_with_dists$te_mar.ct,
+                         by=list(dist.bin=ONNE_with_dists$brks), 
+                         FUN=sum, na.rm=TRUE, na.action=NULL)
+te_mar.dist2 <- aggregate(ONNE_with_dists$te_mar.ct,
+                          by=list(dist.bin=ONNE_with_dists$brks), 
+                          count, na.rm=TRUE, na.action=NULL)
+
+library(dplyr)
+temp <-
+  ONNE_with_dists %>%
+  group_by(brks, te_mar.ct) %>%
+  count(brks)
+
+temp =
+  data.frame(
+    ONNE_with_dists.brks %>% 
+      summarise(
+        length(te_mar.ct>0, na.rm=TRUE),
+        length(brks, na.rm=TRUE)
+  )
+)
+names(temp) <- c("brks", "te_mar.pos", "n") #rename columns
+
+
+
+ggplot(data=ONNE_with_dists, aes(x = fm_dist, fill=brks)) +
+  geom_dotplot(stackgroups = TRUE, binwidth = 4000, method = "histodot") +
+  scale_fill_manual(values=colorRampPalette(c("white", "red"))( length(ONNE_with_dists$brks)))
+head(ONNE_with_dists)
+
+
+### Weight-length
