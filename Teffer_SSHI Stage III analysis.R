@@ -718,4 +718,13 @@ ggplot(data=ONNE_with_dists, aes(x = fm_dist, fill=brks)) +
 head(ONNE_with_dists)
 
 
-### Weight-length
+### Temperature
+# Plot sampled fish per stock by year
+head(pa_ther.sst)
+head(trnc_resid_srr)
+lm(sst_anom ~ )
+sw.temp <- stan_lmer(resid_value ~ 0 + sst + (prev|Stock_Analysis) +(1|brood_year), 
+                          data = sw.data,
+                          adapt_delta=0.95,
+                          REML = F)
+summary(fw.ic_mul.FW)
